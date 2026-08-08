@@ -10,9 +10,13 @@ export interface Client {
   vertical: Vertical;
   assistant_name: string;
   contact_email: string | null;
+  contact_phone: string | null;
   twilio_number: string | null;
   brand_logo_url: string | null;
   brand_color: string | null;
+  buffer_minutes: number;
+  business_hours_start: string;
+  business_hours_end: string;
 }
 
 export interface Staff {
@@ -59,6 +63,7 @@ export interface Lead {
   lost_reason: string | null;
   booking_date: string | null;
   booking_time: string | null;
+  notes: string | null;
   created_at: string;
 }
 
@@ -84,6 +89,7 @@ export interface SchedulingRule {
   day_of_week: number | null;
   blocked_start_time: string;
   blocked_end_time: string;
+  created_at: string;
 }
 
 export interface NotificationPrefs {
