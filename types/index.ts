@@ -111,3 +111,16 @@ export interface ClientUser {
   client_id: string;
   role: "owner" | "staff";
 }
+
+export interface ManualBooking {
+  id: string;
+  client_id: string;
+  customer_name: string;
+  service_id: string | null;
+  price_pence: number;
+  staff_id: string | null;
+  booking_date: string | null;
+  booking_time: string | null;
+  note: string | null;
+  created_at: string;
+}

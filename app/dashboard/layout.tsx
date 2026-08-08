@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { supabaseAdmin } from "@/lib/supabase";
 import { ClientProvider, type ClientMembership } from "@/lib/clientContext";
-import DashboardNav from "@/components/DashboardNav";
+import DashboardSidebar from "@/components/DashboardSidebar";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = createSupabaseServerClient();
@@ -22,9 +22,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
       memberships={(memberships ?? []) as unknown as ClientMembership[]}
       userEmail={user.email ?? ""}
     >
-      <div className="min-h-screen bg-gray-50">
-        <DashboardNav />
-        <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
+      <div className="flex h-screen bg-background">
+        <DashboardSidebar />
+        <main className="flex-1 overflow-y-auto">
+          <div className="mx-auto max-w-6xl px-6 py-8">{children}</div>
+        </main>
       </div>
     </ClientProvider>
   );

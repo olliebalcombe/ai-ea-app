@@ -1,8 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { Pencil, Trash2 } from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabaseClient";
 import { useCurrentClient } from "@/lib/clientContext";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { Category, Service } from "@/types";
 
 function formatPrice(pence: number) {
@@ -120,161 +132,179 @@ export default function ServicesSettingsPage() {
     else load();
   }
 
-  if (loading) return <p className="text-sm text-gray-500">Loading…</p>;
+  if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>;
 
   const uncategorised = services.filter((s) => !s.category_id);
 
   return (
-    <div className="max-w-3xl space-y-8">
-      {error && <p className="text-sm text-red-600">{error}</p>}
+    <div className="max-w-3xl space-y-6">
+      {error && <p className="text-sm text-destructive">{error}</p>}
 
       {[...categories, ...(uncategorised.length > 0 ? [null] : [])].map((cat) => {
-        const catServices = cat
-          ? services.filter((s) => s.category_id === cat.id)
-          : uncategorised;
+        const catServices = cat ? services.filter((s) => s.category_id === cat.id) : uncategorised;
         return (
-          <div key={cat ? cat.id : "uncategorised"} className="rounded-lg border border-gray-200 bg-white">
-            <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+          <Card key={cat ? cat.id : "uncategorised"}>
+            <CardHeader className="flex-row items-center justify-between space-y-0">
               {cat && editingCategoryId === cat.id ? (
-                <div className="flex flex-1 gap-2">
-                  <input
+                <div className="flex flex-1 items-center gap-2">
+                  <Input
                     value={editCategoryName}
                     onChange={(e) => setEditCategoryName(e.target.value)}
-                    className="flex-1 rounded-md border border-gray-300 px-2 py-1 text-sm"
                   />
-                  <button onClick={() => saveCategory(cat.id)} className="text-sm font-medium hover:underline">
+                  <Button size="sm" onClick={() => saveCategory(cat.id)}>
                     Save
-                  </button>
-                  <button onClick={() => setEditingCategoryId(null)} className="text-sm text-gray-500 hover:underline">
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setEditingCategoryId(null)}>
                     Cancel
-                  </button>
+                  </Button>
                 </div>
               ) : (
                 <>
-                  <h3 className="text-sm font-semibold text-gray-900">
-                    {cat ? cat.name : "Uncategorised"}
-                  </h3>
+                  <CardTitle className="text-sm">{cat ? cat.name : "Uncategorised"}</CardTitle>
                   {cat && (
-                    <div className="flex gap-3">
-                      <button
+                    <div className="flex gap-1">
+                      <Button
+                        size="icon"
+                        variant="ghost"
                         onClick={() => {
                           setEditingCategoryId(cat.id);
                           setEditCategoryName(cat.name);
                         }}
-                        className="text-xs text-gray-500 hover:text-gray-700"
                       >
-                        Rename
-                      </button>
-                      <button
-                        onClick={() => removeCategory(cat.id)}
-                        className="text-xs text-red-500 hover:text-red-700"
-                      >
-                        Remove
-                      </button>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button size="icon" variant="ghost" onClick={() => removeCategory(cat.id)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
                     </div>
                   )}
                 </>
               )}
-            </div>
-            {catServices.length === 0 ? (
-              <p className="px-4 py-3 text-sm text-gray-500">No services yet.</p>
-            ) : (
-              <ul className="divide-y divide-gray-100">
-                {catServices.map((s) => (
-                  <li key={s.id} className="flex items-center justify-between px-4 py-3">
-                    {editingServiceId === s.id ? (
-                      <div className="flex flex-1 gap-2">
-                        <input
-                          value={editService.name}
-                          onChange={(e) => setEditService((v) => ({ ...v, name: e.target.value }))}
-                          className="flex-1 rounded-md border border-gray-300 px-2 py-1 text-sm"
-                        />
-                        <input
-                          value={editService.price}
-                          onChange={(e) => setEditService((v) => ({ ...v, price: e.target.value }))}
-                          className="w-24 rounded-md border border-gray-300 px-2 py-1 text-sm"
-                        />
-                        <button onClick={() => saveService(s.id)} className="text-sm font-medium hover:underline">
-                          Save
-                        </button>
-                        <button onClick={() => setEditingServiceId(null)} className="text-sm text-gray-500 hover:underline">
-                          Cancel
-                        </button>
-                      </div>
-                    ) : (
-                      <>
-                        <span className="text-sm text-gray-900">{s.name}</span>
-                        <div className="flex items-center gap-3">
-                          <span className="text-sm text-gray-500">{formatPrice(s.price_pence)}</span>
-                          <button onClick={() => startEditService(s)} className="text-xs text-gray-500 hover:text-gray-700">
-                            Edit
-                          </button>
-                          <button onClick={() => removeService(s.id)} className="text-xs text-red-500 hover:text-red-700">
-                            Remove
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              {catServices.length === 0 ? (
+                <p className="px-6 pb-4 text-sm text-muted-foreground">No services yet.</p>
+              ) : (
+                <Table>
+                  <TableBody>
+                    {catServices.map((s) => (
+                      <TableRow key={s.id}>
+                        {editingServiceId === s.id ? (
+                          <>
+                            <TableCell>
+                              <Input
+                                value={editService.name}
+                                onChange={(e) =>
+                                  setEditService((v) => ({ ...v, name: e.target.value }))
+                                }
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Input
+                                value={editService.price}
+                                onChange={(e) =>
+                                  setEditService((v) => ({ ...v, price: e.target.value }))
+                                }
+                                className="w-24"
+                              />
+                            </TableCell>
+                            <TableCell className="space-x-2 whitespace-nowrap text-right">
+                              <Button size="sm" onClick={() => saveService(s.id)}>
+                                Save
+                              </Button>
+                              <Button size="sm" variant="ghost" onClick={() => setEditingServiceId(null)}>
+                                Cancel
+                              </Button>
+                            </TableCell>
+                          </>
+                        ) : (
+                          <>
+                            <TableCell className="text-foreground">{s.name}</TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {formatPrice(s.price_pence)}
+                            </TableCell>
+                            <TableCell className="space-x-1 whitespace-nowrap text-right">
+                              <Button size="icon" variant="ghost" onClick={() => startEditService(s)}>
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button size="icon" variant="ghost" onClick={() => removeService(s.id)}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </TableCell>
+                          </>
+                        )}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
         );
       })}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <form onSubmit={addCategory} className="rounded-lg border border-gray-200 bg-white p-4">
-          <h3 className="mb-2 text-sm font-semibold text-gray-900">Add category</h3>
-          <div className="flex gap-2">
-            <input
-              value={newCategoryName}
-              onChange={(e) => setNewCategoryName(e.target.value)}
-              placeholder="Category name"
-              required
-              className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm"
-            />
-            <button type="submit" className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800">
-              Add
-            </button>
-          </div>
-        </form>
-
-        <form onSubmit={addService} className="rounded-lg border border-gray-200 bg-white p-4">
-          <h3 className="mb-2 text-sm font-semibold text-gray-900">Add service</h3>
-          <div className="space-y-2">
-            <input
-              value={newService.name}
-              onChange={(e) => setNewService((v) => ({ ...v, name: e.target.value }))}
-              placeholder="Service name"
-              required
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-            />
-            <div className="flex gap-2">
-              <input
-                value={newService.price}
-                onChange={(e) => setNewService((v) => ({ ...v, price: e.target.value }))}
-                placeholder="Price (£)"
-                className="w-28 rounded-md border border-gray-300 px-3 py-2 text-sm"
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Add category</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={addCategory} className="flex gap-2">
+              <Input
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                placeholder="Category name"
+                required
               />
-              <select
-                value={newService.categoryId}
-                onChange={(e) => setNewService((v) => ({ ...v, categoryId: e.target.value }))}
-                className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm"
-              >
-                <option value="">Uncategorised</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <button type="submit" className="w-full rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800">
-              Add
-            </button>
-          </div>
-        </form>
+              <Button type="submit">Add</Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Add service</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={addService} className="space-y-2">
+              <Input
+                value={newService.name}
+                onChange={(e) => setNewService((v) => ({ ...v, name: e.target.value }))}
+                placeholder="Service name"
+                required
+              />
+              <div className="flex gap-2">
+                <Input
+                  value={newService.price}
+                  onChange={(e) => setNewService((v) => ({ ...v, price: e.target.value }))}
+                  placeholder="Price (£)"
+                  className="w-28"
+                />
+                <Select
+                  value={newService.categoryId || "none"}
+                  onValueChange={(v) =>
+                    setNewService((s) => ({ ...s, categoryId: v === "none" ? "" : v }))
+                  }
+                >
+                  <SelectTrigger className="flex-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Uncategorised</SelectItem>
+                    {categories.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button type="submit" className="w-full">
+                Add
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

@@ -3,10 +3,34 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabaseBrowser } from "@/lib/supabaseClient";
 import { useCurrentClient } from "@/lib/clientContext";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import type { NotificationPrefs } from "@/types";
 
 function toTimeInput(value: string) {
   return value?.slice(0, 5) ?? "";
+}
+
+function Row({
+  label,
+  checked,
+  disabled,
+  onCheckedChange,
+}: {
+  label: string;
+  checked: boolean;
+  disabled?: boolean;
+  onCheckedChange?: (v: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between py-2">
+      <Label className={disabled ? "text-muted-foreground" : ""}>{label}</Label>
+      <Switch checked={checked} disabled={disabled} onCheckedChange={onCheckedChange} />
+    </div>
+  );
 }
 
 export default function NotificationsSettingsPage() {
@@ -61,112 +85,86 @@ export default function NotificationsSettingsPage() {
     else setSaved(true);
   }
 
-  if (loading) return <p className="text-sm text-gray-500">Loading…</p>;
-  if (!prefs) return <p className="text-sm text-gray-500">No notification preferences found.</p>;
+  if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>;
+  if (!prefs) return <p className="text-sm text-muted-foreground">No notification preferences found.</p>;
 
   return (
     <div className="max-w-xl space-y-6">
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-destructive">{error}</p>}
 
-      <div className="rounded-lg border border-gray-200 bg-white p-4">
-        <h3 className="mb-3 text-sm font-semibold text-gray-900">Channels</h3>
-        <div className="space-y-3">
-          <label className="flex items-center justify-between text-sm">
-            <span>SMS</span>
-            <input
-              type="checkbox"
-              checked={prefs.sms_enabled}
-              onChange={(e) => update("sms_enabled", e.target.checked)}
-            />
-          </label>
-          <label className="flex items-center justify-between text-sm">
-            <span>Email</span>
-            <input
-              type="checkbox"
-              checked={prefs.email_enabled}
-              onChange={(e) => update("email_enabled", e.target.checked)}
-            />
-          </label>
-          <label className="flex items-center justify-between text-sm text-gray-400">
-            <span>WhatsApp (coming soon)</span>
-            <input type="checkbox" checked={false} disabled />
-          </label>
-          <label className="flex items-center justify-between text-sm text-gray-400">
-            <span>Push (coming soon)</span>
-            <input type="checkbox" checked={false} disabled />
-          </label>
-        </div>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Channels</CardTitle>
+        </CardHeader>
+        <CardContent className="divide-y">
+          <Row label="SMS" checked={prefs.sms_enabled} onCheckedChange={(v) => update("sms_enabled", v)} />
+          <Row
+            label="Email"
+            checked={prefs.email_enabled}
+            onCheckedChange={(v) => update("email_enabled", v)}
+          />
+          <Row label="WhatsApp (coming soon)" checked={false} disabled />
+          <Row label="Push (coming soon)" checked={false} disabled />
+        </CardContent>
+      </Card>
 
-      <div className="rounded-lg border border-gray-200 bg-white p-4">
-        <h3 className="mb-3 text-sm font-semibold text-gray-900">Notify me when…</h3>
-        <div className="space-y-3">
-          <label className="flex items-center justify-between text-sm">
-            <span>A new lead comes in</span>
-            <input
-              type="checkbox"
-              checked={prefs.notify_new_lead}
-              onChange={(e) => update("notify_new_lead", e.target.checked)}
-            />
-          </label>
-          <label className="flex items-center justify-between text-sm">
-            <span>A lead books a slot</span>
-            <input
-              type="checkbox"
-              checked={prefs.notify_booked}
-              onChange={(e) => update("notify_booked", e.target.checked)}
-            />
-          </label>
-          <label className="flex items-center justify-between text-sm">
-            <span>A lead is marked lost</span>
-            <input
-              type="checkbox"
-              checked={prefs.notify_lost}
-              onChange={(e) => update("notify_lost", e.target.checked)}
-            />
-          </label>
-          <label className="flex items-center justify-between text-sm">
-            <span>Daily digest</span>
-            <input
-              type="checkbox"
-              checked={prefs.notify_daily_digest}
-              onChange={(e) => update("notify_daily_digest", e.target.checked)}
-            />
-          </label>
-        </div>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Notify me when…</CardTitle>
+        </CardHeader>
+        <CardContent className="divide-y">
+          <Row
+            label="A new lead comes in"
+            checked={prefs.notify_new_lead}
+            onCheckedChange={(v) => update("notify_new_lead", v)}
+          />
+          <Row
+            label="A lead books a slot"
+            checked={prefs.notify_booked}
+            onCheckedChange={(v) => update("notify_booked", v)}
+          />
+          <Row
+            label="A lead is marked lost"
+            checked={prefs.notify_lost}
+            onCheckedChange={(v) => update("notify_lost", v)}
+          />
+          <Row
+            label="Daily digest"
+            checked={prefs.notify_daily_digest}
+            onCheckedChange={(v) => update("notify_daily_digest", v)}
+          />
+        </CardContent>
+      </Card>
 
-      <div className="rounded-lg border border-gray-200 bg-white p-4">
-        <h3 className="mb-3 text-sm font-semibold text-gray-900">Quiet hours</h3>
-        <p className="mb-3 text-xs text-gray-500">
-          Non-urgent notifications are held during this window. Urgent escalations always send.
-        </p>
-        <div className="flex items-center gap-3">
-          <input
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Quiet hours</CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Non-urgent notifications are held during this window. Urgent escalations always send.
+          </p>
+        </CardHeader>
+        <CardContent className="flex items-center gap-3">
+          <Input
             type="time"
             value={toTimeInput(prefs.quiet_hours_start)}
             onChange={(e) => update("quiet_hours_start", e.target.value)}
-            className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+            className="w-32"
           />
-          <span className="text-sm text-gray-500">to</span>
-          <input
+          <span className="text-sm text-muted-foreground">to</span>
+          <Input
             type="time"
             value={toTimeInput(prefs.quiet_hours_end)}
             onChange={(e) => update("quiet_hours_end", e.target.value)}
-            className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+            className="w-32"
           />
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       <div className="flex items-center gap-3">
-        <button
-          onClick={save}
-          disabled={saving}
-          className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
-        >
+        <Button onClick={save} disabled={saving}>
           {saving ? "Saving…" : "Save changes"}
-        </button>
-        {saved && <span className="text-sm text-green-600">Saved.</span>}
+        </Button>
+        {saved && <span className="text-sm text-green-400">Saved.</span>}
       </div>
     </div>
   );

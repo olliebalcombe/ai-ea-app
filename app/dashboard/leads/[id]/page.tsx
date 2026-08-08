@@ -2,9 +2,21 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabaseClient";
 import { useCurrentClient } from "@/lib/clientContext";
 import StatusBadge from "@/components/StatusBadge";
+import MarkLostDialog from "@/components/MarkLostDialog";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { Lead, LeadAnswer, LeadMessage, LeadStatus, Staff, Service } from "@/types";
 
 type LeadRow = Lead & {
@@ -34,10 +46,11 @@ export default function LeadDetailPage({ params }: { params: { id: string } }) {
   const [servicesList, setServicesList] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
 
-  const [showLostInput, setShowLostInput] = useState(false);
-  const [lostReason, setLostReason] = useState("");
+  const [lostDialogOpen, setLostDialogOpen] = useState(false);
+  const [notes, setNotes] = useState("");
+  const [notesSaving, setNotesSaving] = useState(false);
+  const [notesSaved, setNotesSaved] = useState(false);
 
   const [bookingStaffId, setBookingStaffId] = useState("");
   const [bookingServiceId, setBookingServiceId] = useState("");
@@ -60,6 +73,7 @@ export default function LeadDetailPage({ params }: { params: { id: string } }) {
     }
     const row = data as unknown as LeadRow;
     setLead(row);
+    setNotes(row.notes ?? "");
     setBookingStaffId(row.assigned_staff_id ?? "");
     setBookingServiceId(row.service_id ?? "");
   }, [leadId]);
@@ -94,19 +108,33 @@ export default function LeadDetailPage({ params }: { params: { id: string } }) {
 
   async function updateStatus(status: LeadStatus, extra?: Partial<Lead>) {
     if (!lead) return;
-    setSaving(true);
     const { error } = await supabaseBrowser
       .from("leads")
       .update({ status, ...extra })
       .eq("id", lead.id);
-    setSaving(false);
     if (error) {
       setError(error.message);
       return;
     }
-    setShowLostInput(false);
-    setLostReason("");
+    setLostDialogOpen(false);
     loadLead();
+  }
+
+  async function confirmLost(reason: string | null) {
+    await updateStatus("Lost", { lost_reason: reason });
+  }
+
+  async function saveNotes() {
+    if (!lead) return;
+    setNotesSaving(true);
+    const { error } = await supabaseBrowser.from("leads").update({ notes: notes || null }).eq("id", lead.id);
+    setNotesSaving(false);
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    setNotesSaved(true);
+    setTimeout(() => setNotesSaved(false), 2000);
   }
 
   async function updateAssignedStaff(staffId: string) {
@@ -162,195 +190,222 @@ export default function LeadDetailPage({ params }: { params: { id: string } }) {
     }
   }
 
-  if (loading) return <p className="text-sm text-gray-500">Loading…</p>;
-  if (error) return <p className="text-sm text-red-600">{error}</p>;
-  if (!lead) return <p className="text-sm text-gray-500">Lead not found.</p>;
+  if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>;
+  if (error) return <p className="text-sm text-destructive">{error}</p>;
+  if (!lead) return <p className="text-sm text-muted-foreground">Lead not found.</p>;
 
   return (
     <div>
-      <button
-        onClick={() => router.push("/dashboard")}
-        className="mb-4 text-sm text-gray-500 hover:text-gray-700"
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => router.push("/dashboard/leads")}
+        className="mb-4 -ml-2 text-muted-foreground"
       >
-        ← Back to Lead Queue
-      </button>
+        <ArrowLeft className="h-4 w-4" />
+        Back to Lead Queue
+      </Button>
 
       <div className="mb-6 flex items-start justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">{lead.name ?? "Unknown"}</h1>
-          <p className="text-sm text-gray-500">{lead.phone ?? lead.email ?? "No contact info"}</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+            {lead.name ?? "Unknown"}
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            {lead.phone ?? lead.email ?? "No contact info"}
+          </p>
         </div>
         <StatusBadge status={lead.status} />
       </div>
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-        <div className="md:col-span-2 space-y-6">
-          {/* Conversation transcript */}
-          <div className="rounded-lg border border-gray-200 bg-white p-4">
-            <h2 className="mb-3 text-sm font-semibold text-gray-900">Conversation</h2>
-            {messages.length === 0 ? (
-              <p className="text-sm text-gray-500">No messages yet.</p>
-            ) : (
-              <div className="space-y-2">
-                {messages.map((m) => (
-                  <div
-                    key={m.id}
-                    className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
-                      m.sender === "lead"
-                        ? "bg-gray-100 text-gray-900"
-                        : m.sender === "ai"
-                        ? "ml-auto bg-gray-900 text-white"
-                        : "mx-auto bg-amber-50 text-amber-800 text-center"
-                    }`}
-                  >
-                    {m.body}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+        <div className="space-y-6 md:col-span-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Conversation</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {messages.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No messages yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {messages.map((m) => (
+                    <div
+                      key={m.id}
+                      className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
+                        m.sender === "lead"
+                          ? "bg-muted text-foreground"
+                          : m.sender === "ai"
+                          ? "ml-auto bg-primary text-primary-foreground"
+                          : "mx-auto bg-amber-500/10 text-center text-amber-300"
+                      }`}
+                    >
+                      {m.body}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-          {/* Qualifying answers */}
           {lead.lead_answers.length > 0 && (
-            <div className="rounded-lg border border-gray-200 bg-white p-4">
-              <h2 className="mb-3 text-sm font-semibold text-gray-900">Answers</h2>
-              <dl className="space-y-2 text-sm">
-                {lead.lead_answers.map((a) => (
-                  <div key={a.id}>
-                    <dt className="text-gray-500">{a.question}</dt>
-                    <dd className="text-gray-900">{a.answer}</dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">Answers</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <dl className="space-y-2 text-sm">
+                  {lead.lead_answers.map((a) => (
+                    <div key={a.id}>
+                      <dt className="text-muted-foreground">{a.question}</dt>
+                      <dd className="text-foreground">{a.answer}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </CardContent>
+            </Card>
           )}
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Notes</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <Textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Internal notes about this lead…"
+                rows={4}
+              />
+              <div className="flex items-center gap-3">
+                <Button size="sm" variant="outline" onClick={saveNotes} disabled={notesSaving}>
+                  {notesSaving ? "Saving…" : "Save notes"}
+                </Button>
+                {notesSaved && <span className="text-xs text-green-400">Saved.</span>}
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         <div className="space-y-6">
-          {/* Status controls */}
-          <div className="rounded-lg border border-gray-200 bg-white p-4">
-            <h2 className="mb-3 text-sm font-semibold text-gray-900">Status</h2>
-            <div className="flex flex-wrap gap-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Status</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-wrap gap-2">
               {(["Contacted", "Qualified", "Won"] as LeadStatus[]).map((s) => (
-                <button
+                <Button
                   key={s}
-                  disabled={saving || lead.status === s}
+                  variant="outline"
+                  size="sm"
+                  disabled={lead.status === s}
                   onClick={() => updateStatus(s)}
-                  className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40"
                 >
                   Mark {s}
-                </button>
+                </Button>
               ))}
-              <button
-                disabled={saving || lead.status === "Lost"}
-                onClick={() => setShowLostInput(true)}
-                className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-40"
+              <Button
+                variant="destructive"
+                size="sm"
+                disabled={lead.status === "Lost"}
+                onClick={() => setLostDialogOpen(true)}
               >
                 Mark Lost
-              </button>
-            </div>
-            {showLostInput && (
-              <div className="mt-3 space-y-2">
-                <input
-                  type="text"
-                  placeholder="Reason (optional)"
-                  value={lostReason}
-                  onChange={(e) => setLostReason(e.target.value)}
-                  className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm"
-                />
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => updateStatus("Lost", { lost_reason: lostReason || null })}
-                    className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
-                  >
-                    Confirm
-                  </button>
-                  <button
-                    onClick={() => setShowLostInput(false)}
-                    className="text-xs text-gray-500 hover:text-gray-700"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+              </Button>
+            </CardContent>
+          </Card>
 
-          {/* Staff assignment */}
-          <div className="rounded-lg border border-gray-200 bg-white p-4">
-            <h2 className="mb-3 text-sm font-semibold text-gray-900">Assigned to</h2>
-            <select
-              value={lead.assigned_staff_id ?? ""}
-              onChange={(e) => updateAssignedStaff(e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm"
-            >
-              <option value="">Unassigned</option>
-              {staffList.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Booking widget */}
-          <div className="rounded-lg border border-gray-200 bg-white p-4">
-            <h2 className="mb-3 text-sm font-semibold text-gray-900">Book a slot</h2>
-            <div className="space-y-2">
-              <select
-                value={bookingServiceId}
-                onChange={(e) => setBookingServiceId(e.target.value)}
-                className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Assigned to</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Select
+                value={lead.assigned_staff_id ?? "unassigned"}
+                onValueChange={(v) => updateAssignedStaff(v === "unassigned" ? "" : v)}
               >
-                <option value="">Choose a service…</option>
-                {servicesList.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} ({formatPrice(s.price_pence)})
-                  </option>
-                ))}
-              </select>
-              <select
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unassigned">Unassigned</SelectItem>
+                  {staffList.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Book a slot</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <Select value={bookingServiceId} onValueChange={setBookingServiceId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose a service…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {servicesList.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.name} ({formatPrice(s.price_pence)})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select
                 value={bookingStaffId}
-                onChange={(e) => {
-                  setBookingStaffId(e.target.value);
+                onValueChange={(v) => {
+                  setBookingStaffId(v);
                   setSlots([]);
                 }}
-                className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm"
               >
-                <option value="">Choose staff…</option>
-                {staffList.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-              <button
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose staff…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {staffList.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
                 onClick={fetchSlots}
                 disabled={!bookingStaffId || slotsLoading}
-                className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40"
               >
                 {slotsLoading ? "Loading slots…" : "Show available slots"}
-              </button>
+              </Button>
 
-              {bookingError && <p className="text-xs text-red-600">{bookingError}</p>}
+              {bookingError && <p className="text-xs text-destructive">{bookingError}</p>}
 
               {slots.length > 0 && (
                 <div className="grid grid-cols-2 gap-2 pt-2">
                   {slots.map((slot) => (
-                    <button
+                    <Button
                       key={`${slot.date}-${slot.time}`}
+                      variant="outline"
+                      size="sm"
                       onClick={() => confirmBooking(slot)}
-                      className="rounded-md border border-gray-300 px-2 py-1.5 text-xs hover:bg-gray-50"
                     >
                       {slot.date} {slot.time}
-                    </button>
+                    </Button>
                   ))}
                 </div>
               )}
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
+
+      <MarkLostDialog open={lostDialogOpen} onOpenChange={setLostDialogOpen} onConfirm={confirmLost} />
     </div>
   );
 }

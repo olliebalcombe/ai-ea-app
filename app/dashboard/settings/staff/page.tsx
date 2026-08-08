@@ -1,8 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { Pencil, Trash2 } from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabaseClient";
 import { useCurrentClient } from "@/lib/clientContext";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Staff } from "@/types";
 
 export default function StaffSettingsPage() {
@@ -77,93 +82,82 @@ export default function StaffSettingsPage() {
   }
 
   return (
-    <div className="max-w-2xl">
-      {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
+    <div className="max-w-2xl space-y-6">
+      {error && <p className="text-sm text-destructive">{error}</p>}
 
-      <div className="mb-6 overflow-hidden rounded-lg border border-gray-200 bg-white">
-        {loading ? (
-          <p className="p-4 text-sm text-gray-500">Loading…</p>
-        ) : staff.length === 0 ? (
-          <p className="p-4 text-sm text-gray-500">No staff added yet.</p>
-        ) : (
-          <ul className="divide-y divide-gray-100">
-            {staff.map((s) => (
-              <li key={s.id} className="flex items-center justify-between gap-2 px-4 py-3">
-                {editingId === s.id ? (
-                  <div className="flex flex-1 gap-2">
-                    <input
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                      className="flex-1 rounded-md border border-gray-300 px-2 py-1 text-sm"
-                    />
-                    <input
-                      value={editRole}
-                      onChange={(e) => setEditRole(e.target.value)}
-                      placeholder="Role"
-                      className="flex-1 rounded-md border border-gray-300 px-2 py-1 text-sm"
-                    />
-                    <button
-                      onClick={() => saveEdit(s.id)}
-                      className="text-sm font-medium text-gray-900 hover:underline"
-                    >
-                      Save
-                    </button>
-                    <button
-                      onClick={() => setEditingId(null)}
-                      className="text-sm text-gray-500 hover:underline"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    <div>
-                      <span className="text-sm font-medium text-gray-900">{s.name}</span>
-                      {s.role && <span className="ml-2 text-xs text-gray-500">{s.role}</span>}
-                    </div>
-                    <div className="flex gap-3">
-                      <button
-                        onClick={() => startEdit(s)}
-                        className="text-xs text-gray-500 hover:text-gray-700"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => removeStaff(s.id)}
-                        className="text-xs text-red-500 hover:text-red-700"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  </>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      <Card>
+        <CardContent className="p-0">
+          {loading ? (
+            <p className="p-4 text-sm text-muted-foreground">Loading…</p>
+          ) : staff.length === 0 ? (
+            <p className="p-4 text-sm text-muted-foreground">No staff added yet.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead className="w-20" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {staff.map((s) => (
+                  <TableRow key={s.id}>
+                    {editingId === s.id ? (
+                      <>
+                        <TableCell>
+                          <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
+                        </TableCell>
+                        <TableCell>
+                          <Input value={editRole} onChange={(e) => setEditRole(e.target.value)} />
+                        </TableCell>
+                        <TableCell className="space-x-2 whitespace-nowrap">
+                          <Button size="sm" onClick={() => saveEdit(s.id)}>
+                            Save
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>
+                            Cancel
+                          </Button>
+                        </TableCell>
+                      </>
+                    ) : (
+                      <>
+                        <TableCell className="font-medium text-foreground">{s.name}</TableCell>
+                        <TableCell className="text-muted-foreground">{s.role ?? "—"}</TableCell>
+                        <TableCell className="space-x-1 whitespace-nowrap text-right">
+                          <Button size="icon" variant="ghost" onClick={() => startEdit(s)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button size="icon" variant="ghost" onClick={() => removeStaff(s.id)}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </TableCell>
+                      </>
+                    )}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
 
-      <form onSubmit={addStaff} className="flex gap-2">
-        <input
-          value={newName}
-          onChange={(e) => setNewName(e.target.value)}
-          placeholder="Name"
-          required
-          className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm"
-        />
-        <input
-          value={newRole}
-          onChange={(e) => setNewRole(e.target.value)}
-          placeholder="Role (optional)"
-          className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm"
-        />
-        <button
-          type="submit"
-          className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
-        >
-          Add
-        </button>
-      </form>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Add staff</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={addStaff} className="flex gap-2">
+            <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Name" required />
+            <Input
+              value={newRole}
+              onChange={(e) => setNewRole(e.target.value)}
+              placeholder="Role (optional)"
+            />
+            <Button type="submit">Add</Button>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }
