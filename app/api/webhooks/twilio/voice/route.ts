@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { sendSms } from "@/lib/twilio";
+import { buildVoiceOpener } from "@/lib/prompts";
 
 /**
  * Twilio calls this webhook when someone calls a client's tracking number.
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest) {
     .select()
     .single();
 
-  const openingMessage = `Hi! I'm ${client.assistant_name}, sorry we missed you -- what can I help with?`;
+  const openingMessage = buildVoiceOpener({ assistantName: client.assistant_name, toneStyle: client.tone_style });
   await supabaseAdmin.from("lead_messages").insert({ lead_id: lead!.id, sender: "ai", body: openingMessage });
   await sendSms(from, openingMessage);
 

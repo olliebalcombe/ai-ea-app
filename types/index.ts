@@ -3,6 +3,7 @@
 export type Vertical = "Tradie" | "Law Firm" | "Clinic" | "Estate Agent" | string;
 export type Channel = "call" | "sms" | "email";
 export type LeadStatus = "New" | "Contacted" | "Qualified" | "Booked" | "Won" | "Lost";
+export type ToneStyle = "calm_direct" | "warm_friendly" | "formal_executive";
 
 export interface Client {
   id: string;
@@ -17,6 +18,8 @@ export interface Client {
   buffer_minutes: number;
   business_hours_start: string;
   business_hours_end: string;
+  tone_style: ToneStyle;
+  business_nuances: string | null;
 }
 
 export interface Staff {

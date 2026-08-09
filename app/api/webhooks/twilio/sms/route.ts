@@ -60,7 +60,14 @@ export async function POST(req: NextRequest) {
   const allQuestions = DEFAULT_QUESTIONS[client.vertical] || [];
   const questionsRemaining = allQuestions.filter((q) => !answeredQuestions.has(q));
 
-  const systemPrompt = buildSystemPrompt(client.vertical, client.name, client.assistant_name);
+  const systemPrompt = buildSystemPrompt({
+    vertical: client.vertical,
+    businessName: client.name,
+    assistantName: client.assistant_name,
+    channel: "sms",
+    toneStyle: client.tone_style,
+    businessNuances: client.business_nuances,
+  });
   const { reply, extractedAnswer, escalation } = await runQualificationTurn({
     systemPrompt,
     history,

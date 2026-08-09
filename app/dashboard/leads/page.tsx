@@ -1,15 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Search, Phone, MessageSquare, Mail, MessageCircle, ArrowRight, XCircle, UserCircle2 } from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabaseClient";
 import { useCurrentClient } from "@/lib/clientContext";
 import { waLink } from "@/lib/whatsapp";
 import MarkLostDialog from "@/components/MarkLostDialog";
+import LeadDetailContent from "@/components/LeadDetailContent";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import type { Lead, LeadAnswer, LeadStatus, Category } from "@/types";
 
@@ -37,7 +38,6 @@ function formatPrice(pence: number | null) {
 }
 
 export default function LeadQueuePage() {
-  const router = useRouter();
   const { currentClientId } = useCurrentClient();
   const [leads, setLeads] = useState<LeadRow[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -45,6 +45,7 @@ export default function LeadQueuePage() {
   const [search, setSearch] = useState("");
   const [catFilter, setCatFilter] = useState<string>("All");
   const [lostTarget, setLostTarget] = useState<LeadRow | null>(null);
+  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
 
   async function load() {
     if (!currentClientId) return;
@@ -164,7 +165,7 @@ export default function LeadQueuePage() {
                     return (
                       <Card
                         key={lead.id}
-                        onClick={() => router.push(`/dashboard/leads/${lead.id}`)}
+                        onClick={() => setSelectedLeadId(lead.id)}
                         className="cursor-pointer p-3 hover:border-primary/30"
                       >
                         <div className="mb-2 flex items-center justify-between">
@@ -252,6 +253,20 @@ export default function LeadQueuePage() {
         onOpenChange={(open) => !open && setLostTarget(null)}
         onConfirm={confirmLost}
       />
+
+      <Sheet
+        open={!!selectedLeadId}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedLeadId(null);
+            load();
+          }
+        }}
+      >
+        <SheetContent className="w-full overflow-y-auto sm:max-w-2xl">
+          {selectedLeadId && <LeadDetailContent leadId={selectedLeadId} compact />}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
