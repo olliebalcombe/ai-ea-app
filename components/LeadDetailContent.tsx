@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { MessageCircle, CheckCheck } from "lucide-react";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { MessageCircle, CheckCheck, ImagePlus, Sparkles, Send, CalendarClock, PoundSterling, Wand2 } from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabaseClient";
 import { useCurrentClient } from "@/lib/clientContext";
 import { waLink } from "@/lib/whatsapp";
@@ -11,6 +11,7 @@ import MarkLostDialog from "@/components/MarkLostDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -18,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { Lead, LeadAnswer, LeadMessage, LeadStatus, Staff, Service } from "@/types";
+import type { Lead, LeadAnswer, LeadMedia, LeadMessage, LeadStatus, Staff, Service } from "@/types";
 
 type LeadRow = Lead & {
   lead_answers: LeadAnswer[];
@@ -63,6 +64,17 @@ export default function LeadDetailContent({
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
 
+  const [media, setMedia] = useState<(LeadMedia & { signedUrl: string | null })[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [analyzingId, setAnalyzingId] = useState<string | null>(null);
+  const [mediaError, setMediaError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [composeText, setComposeText] = useState("");
+  const [sending, setSending] = useState(false);
+  const [toolbarLoading, setToolbarLoading] = useState<string | null>(null);
+  const [composeError, setComposeError] = useState<string | null>(null);
+
   const loadLead = useCallback(async () => {
     const { data, error } = await supabaseBrowser
       .from("leads")
@@ -92,10 +104,26 @@ export default function LeadDetailContent({
     if (!error) setMessages((data as LeadMessage[]) ?? []);
   }, [leadId]);
 
+  const loadMedia = useCallback(async () => {
+    const { data, error } = await supabaseBrowser
+      .from("lead_media")
+      .select("*")
+      .eq("lead_id", leadId)
+      .order("created_at", { ascending: false });
+    if (error || !data) return;
+    const withUrls = await Promise.all(
+      (data as LeadMedia[]).map(async (m) => {
+        const { data: signed } = await supabaseBrowser.storage.from("lead-media").createSignedUrl(m.path, 3600);
+        return { ...m, signedUrl: signed?.signedUrl ?? null };
+      })
+    );
+    setMedia(withUrls);
+  }, [leadId]);
+
   useEffect(() => {
     setLoading(true);
-    Promise.all([loadLead(), loadMessages()]).finally(() => setLoading(false));
-  }, [loadLead, loadMessages]);
+    Promise.all([loadLead(), loadMessages(), loadMedia()]).finally(() => setLoading(false));
+  }, [loadLead, loadMessages, loadMedia]);
 
   useEffect(() => {
     if (!currentClientId) return;
@@ -151,6 +179,41 @@ export default function LeadDetailContent({
     if (!error) loadLead();
   }
 
+  async function uploadPhoto(file: File) {
+    if (!currentClientId || !lead) return;
+    setUploading(true);
+    setMediaError(null);
+    try {
+      const path = `${currentClientId}/${lead.id}/${Date.now()}-${file.name}`;
+      const { error: uploadError } = await supabaseBrowser.storage.from("lead-media").upload(path, file);
+      if (uploadError) throw uploadError;
+
+      const { data: mediaRow, error: insertError } = await supabaseBrowser
+        .from("lead_media")
+        .insert({ lead_id: lead.id, path })
+        .select()
+        .single();
+      if (insertError || !mediaRow) throw insertError ?? new Error("Failed to save media record");
+
+      await loadMedia();
+      setAnalyzingId(mediaRow.id);
+
+      const res = await fetch(`/api/leads/${lead.id}/analyze-photo`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ media_id: mediaRow.id, path }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Analysis failed");
+      await loadMedia();
+    } catch (e) {
+      setMediaError(e instanceof Error ? e.message : "Upload failed");
+    } finally {
+      setUploading(false);
+      setAnalyzingId(null);
+    }
+  }
+
   async function fetchSlots() {
     if (!bookingStaffId) return;
     setSlotsLoading(true);
@@ -195,6 +258,97 @@ export default function LeadDetailContent({
     }
   }
 
+  async function sendMessage() {
+    if (!composeText.trim() || sending) return;
+    setSending(true);
+    setComposeError(null);
+    try {
+      const res = await fetch(`/api/leads/${leadId}/send-message`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body: composeText.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Send failed");
+      setComposeText("");
+      loadMessages();
+    } catch (e) {
+      setComposeError(e instanceof Error ? e.message : "Send failed");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function injectAvailableSlots() {
+    if (!bookingStaffId) {
+      setComposeError("Choose a staff member in the booking widget first.");
+      return;
+    }
+    setToolbarLoading("slots");
+    setComposeError(null);
+    try {
+      const res = await fetch(`/api/leads/${leadId}/book?staff_id=${bookingStaffId}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed to load slots");
+      const found: Slot[] = data.slots ?? [];
+      if (found.length === 0) {
+        setComposeError("No available slots found for that staff member.");
+        return;
+      }
+      const text = `Here are some times that could work: ${found
+        .slice(0, 3)
+        .map((s) => `${s.date} at ${s.time}`)
+        .join(", ")}. Let me know what suits you.`;
+      setComposeText((t) => (t.trim() ? `${t}\n${text}` : text));
+    } catch (e) {
+      setComposeError(e instanceof Error ? e.message : "Failed to load slots");
+    } finally {
+      setToolbarLoading(null);
+    }
+  }
+
+  async function draftQuote() {
+    setToolbarLoading("quote");
+    setComposeError(null);
+    try {
+      const res = await fetch(`/api/leads/${leadId}/draft-message`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "quote" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Draft failed");
+      setComposeText(data.text);
+    } catch (e) {
+      setComposeError(e instanceof Error ? e.message : "Draft failed");
+    } finally {
+      setToolbarLoading(null);
+    }
+  }
+
+  async function polishTone(tone: "Calm" | "Friendly" | "Direct") {
+    if (!composeText.trim()) {
+      setComposeError("Type a message first, then polish its tone.");
+      return;
+    }
+    setToolbarLoading(`polish-${tone}`);
+    setComposeError(null);
+    try {
+      const res = await fetch(`/api/leads/${leadId}/draft-message`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "polish", currentText: composeText, tone }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Polish failed");
+      setComposeText(data.text);
+    } catch (e) {
+      setComposeError(e instanceof Error ? e.message : "Polish failed");
+    } finally {
+      setToolbarLoading(null);
+    }
+  }
+
   if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>;
   if (error) return <p className="text-sm text-destructive">{error}</p>;
   if (!lead) return <p className="text-sm text-muted-foreground">Lead not found.</p>;
@@ -228,47 +382,171 @@ export default function LeadDetailContent({
       <div className={cn("grid grid-cols-1 gap-6", !compact && "md:grid-cols-3")}>
         <div className={cn("space-y-6", !compact && "md:col-span-2")}>
           <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Conversation</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {messages.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No messages yet.</p>
-              ) : (
-                <div className="space-y-2 rounded-lg bg-black/25 p-4">
-                  {messages.map((m) => (
-                    <div
-                      key={m.id}
-                      className={`flex ${
-                        m.sender === "system" ? "justify-center" : m.sender === "ai" ? "justify-end" : "justify-start"
-                      }`}
-                    >
-                      <div
-                        className={`max-w-[75%] rounded-2xl px-3.5 py-2 text-sm shadow-sm ${
-                          m.sender === "lead"
-                            ? "rounded-bl-sm bg-secondary text-foreground"
-                            : m.sender === "ai"
-                            ? "rounded-br-sm bg-primary text-primary-foreground"
-                            : "bg-amber-500/10 text-center text-xs text-amber-300"
-                        }`}
-                      >
-                        {m.body}
+            <CardContent className="pt-6">
+              <Tabs defaultValue="conversation">
+                <TabsList className="mb-4">
+                  <TabsTrigger value="conversation">Conversation</TabsTrigger>
+                  <TabsTrigger value="media">Media {media.length > 0 && `(${media.length})`}</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="conversation" className="mt-0 space-y-3">
+                  {messages.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No messages yet.</p>
+                  ) : (
+                    <div className="space-y-2 rounded-lg bg-black/25 p-4">
+                      {messages.map((m) => (
                         <div
-                          className={`mt-1 flex items-center justify-end gap-1 text-right text-[10px] ${
-                            m.sender === "ai" ? "text-primary-foreground/60" : "text-muted-foreground"
+                          key={m.id}
+                          className={`flex ${
+                            m.sender === "system"
+                              ? "justify-center"
+                              : m.sender === "ai" || m.sender === "staff"
+                              ? "justify-end"
+                              : "justify-start"
                           }`}
                         >
-                          {new Date(m.created_at).toLocaleTimeString("en-GB", {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                          {m.sender === "ai" && <CheckCheck className="h-3 w-3 text-sky-300" />}
+                          <div className={m.sender === "system" ? "" : "max-w-[75%]"}>
+                            {(m.sender === "ai" || m.sender === "staff") && (
+                              <div className="mb-0.5 text-right text-[10px] font-medium text-muted-foreground">
+                                {m.sender === "ai" ? "AI Assistant" : "You"}
+                              </div>
+                            )}
+                            <div
+                              className={`rounded-2xl px-3.5 py-2 text-sm shadow-sm ${
+                                m.sender === "lead"
+                                  ? "rounded-bl-sm bg-secondary text-foreground"
+                                  : m.sender === "ai"
+                                  ? "rounded-br-sm bg-primary text-primary-foreground"
+                                  : m.sender === "staff"
+                                  ? "rounded-br-sm border border-sky-500/30 bg-sky-500/15 text-sky-100"
+                                  : "bg-amber-500/10 text-center text-xs text-amber-300"
+                              }`}
+                            >
+                              {m.body}
+                              <div
+                                className={`mt-1 flex items-center justify-end gap-1 text-right text-[10px] ${
+                                  m.sender === "ai" ? "text-primary-foreground/60" : "text-muted-foreground"
+                                }`}
+                              >
+                                {new Date(m.created_at).toLocaleTimeString("en-GB", {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                                {(m.sender === "ai" || m.sender === "staff") && (
+                                  <CheckCheck className="h-3 w-3 text-sky-300" />
+                                )}
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                      </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              )}
+                  )}
+
+                  <div className="space-y-2 border-t border-border pt-3">
+                    <div className="flex flex-wrap gap-1.5">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs"
+                        onClick={injectAvailableSlots}
+                        disabled={toolbarLoading === "slots"}
+                      >
+                        <CalendarClock className="h-3 w-3" />
+                        {toolbarLoading === "slots" ? "Loading…" : "Inject Available Slots"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs"
+                        onClick={draftQuote}
+                        disabled={toolbarLoading === "quote"}
+                      >
+                        <PoundSterling className="h-3 w-3" />
+                        {toolbarLoading === "quote" ? "Drafting…" : "Draft Ballpark Quote"}
+                      </Button>
+                      {(["Calm", "Friendly", "Direct"] as const).map((tone) => (
+                        <Button
+                          key={tone}
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs"
+                          onClick={() => polishTone(tone)}
+                          disabled={toolbarLoading === `polish-${tone}`}
+                        >
+                          <Wand2 className="h-3 w-3" />
+                          {toolbarLoading === `polish-${tone}` ? "Polishing…" : `${tone} Tone`}
+                        </Button>
+                      ))}
+                    </div>
+
+                    <Textarea
+                      value={composeText}
+                      onChange={(e) => setComposeText(e.target.value)}
+                      placeholder="Write a reply…"
+                      rows={3}
+                    />
+                    {composeError && <p className="text-xs text-destructive">{composeError}</p>}
+                    <div className="flex justify-end">
+                      <Button size="sm" onClick={sendMessage} disabled={sending || !composeText.trim()}>
+                        <Send className="h-3.5 w-3.5" />
+                        {sending ? "Sending…" : "Send"}
+                      </Button>
+                    </div>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="media" className="mt-0 space-y-3">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) uploadPhoto(file);
+                      e.target.value = "";
+                    }}
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                  >
+                    <ImagePlus className="h-3.5 w-3.5" />
+                    {uploading ? "Uploading…" : "Upload site photo"}
+                  </Button>
+                  {mediaError && <p className="text-xs text-destructive">{mediaError}</p>}
+
+                  {media.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No photos uploaded yet.</p>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      {media.map((m) => (
+                        <div key={m.id} className="overflow-hidden rounded-lg border border-border">
+                          {m.signedUrl && (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={m.signedUrl} alt="Site photo" className="h-40 w-full object-cover" />
+                          )}
+                          <div className="p-3">
+                            <div className="mb-1 flex items-center gap-1.5 text-xs font-medium text-primary">
+                              <Sparkles className="h-3 w-3" /> AI Visual Analysis
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {m.ai_summary
+                                ? m.ai_summary
+                                : analyzingId === m.id
+                                ? "Analyzing…"
+                                : "No analysis yet."}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
             </CardContent>
           </Card>
 

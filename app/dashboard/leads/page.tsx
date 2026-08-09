@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Search, Phone, MessageSquare, Mail, MessageCircle, ArrowRight, XCircle, UserCircle2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Search, Phone, MessageSquare, Mail, MessageCircle, ArrowRight, XCircle, UserCircle2, AlertTriangle } from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabaseClient";
 import { useCurrentClient } from "@/lib/clientContext";
 import { waLink } from "@/lib/whatsapp";
@@ -46,6 +46,7 @@ export default function LeadQueuePage() {
   const [catFilter, setCatFilter] = useState<string>("All");
   const [lostTarget, setLostTarget] = useState<LeadRow | null>(null);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const qualifiedColRef = useRef<HTMLDivElement>(null);
 
   async function load() {
     if (!currentClientId) return;
@@ -99,6 +100,11 @@ export default function LeadQueuePage() {
     filtered = filtered.filter((l) => l.categories?.name === catFilter);
   }
 
+  const thirtyMinAgo = Date.now() - 30 * 60 * 1000;
+  const staleQualified = leads.filter(
+    (l) => l.status === "Qualified" && new Date(l.updated_at).getTime() < thirtyMinAgo
+  );
+
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
@@ -144,6 +150,20 @@ export default function LeadQueuePage() {
         </div>
       </div>
 
+      {staleQualified.length > 0 && (
+        <button
+          onClick={() => qualifiedColRef.current?.scrollIntoView({ behavior: "smooth", inline: "center" })}
+          className="mb-6 flex w-full items-center gap-3 rounded-lg border border-amber-500/25 bg-amber-500/[0.07] p-4 text-left transition-colors hover:bg-amber-500/[0.12]"
+        >
+          <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400" />
+          <span className="text-sm text-foreground">
+            <strong>{staleQualified.length}</strong> qualified lead{staleQualified.length > 1 ? "s" : ""} waiting on you
+            for over 30 minutes — worth a look.
+          </span>
+          <span className="ml-auto text-xs text-amber-400">Review now →</span>
+        </button>
+      )}
+
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : (
@@ -151,7 +171,11 @@ export default function LeadQueuePage() {
           {STATUS_FLOW.map((status) => {
             const col = filtered.filter((l) => l.status === status);
             return (
-              <div key={status} className="w-[260px] shrink-0">
+              <div
+                key={status}
+                ref={status === "Qualified" ? qualifiedColRef : undefined}
+                className="w-[260px] shrink-0"
+              >
                 <div className="mb-3 flex items-center gap-2 px-1">
                   <span className="text-sm font-semibold text-foreground">{status}</span>
                   <span className="text-xs text-muted-foreground">{col.length}</span>

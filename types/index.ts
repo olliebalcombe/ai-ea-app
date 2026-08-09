@@ -20,6 +20,7 @@ export interface Client {
   business_hours_end: string;
   tone_style: ToneStyle;
   business_nuances: string | null;
+  theme_tokens: Record<string, unknown> | null;
 }
 
 export interface Staff {
@@ -68,12 +69,13 @@ export interface Lead {
   booking_time: string | null;
   notes: string | null;
   created_at: string;
+  updated_at: string;
 }
 
 export interface LeadMessage {
   id: string;
   lead_id: string;
-  sender: "ai" | "lead" | "system";
+  sender: "ai" | "lead" | "system" | "staff";
   body: string;
   created_at: string;
 }
@@ -125,5 +127,24 @@ export interface ManualBooking {
   booking_date: string | null;
   booking_time: string | null;
   note: string | null;
+  created_at: string;
+}
+
+export interface LeadMedia {
+  id: string;
+  lead_id: string;
+  path: string;
+  ai_summary: string | null;
+  created_at: string;
+}
+
+export type KnowledgeCategory = "pricing_rule" | "faq" | "service_area" | "team_specialty";
+
+export interface KnowledgeBaseEntry {
+  id: string;
+  client_id: string;
+  category: KnowledgeCategory;
+  title: string;
+  content: string;
   created_at: string;
 }

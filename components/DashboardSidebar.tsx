@@ -10,6 +10,8 @@ import {
   ClipboardList,
   FileBarChart,
   Calendar,
+  BookOpen,
+  Palette,
   Users,
   Wrench,
   ListChecks,
@@ -40,6 +42,8 @@ const NAV = [
   { href: "/dashboard/bookings", label: "Bookings", icon: ClipboardList },
   { href: "/dashboard/calendar", label: "Calendar", icon: Calendar },
   { href: "/dashboard/reports", label: "Reports", icon: FileBarChart },
+  { href: "/dashboard/knowledge-base", label: "Knowledge Base", icon: BookOpen },
+  { href: "/dashboard/design-studio", label: "Design Studio", icon: Palette },
 ];
 
 const SETTINGS_NAV = [

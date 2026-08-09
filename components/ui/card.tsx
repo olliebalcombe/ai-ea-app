@@ -5,13 +5,19 @@ import { cn } from "@/lib/utils"
 const Card = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => (
+>(({ className, style, ...props }, ref) => (
   <div
     ref={ref}
     className={cn(
-      "rounded-xl border border-white/[0.12] bg-card/70 text-card-foreground shadow-lg shadow-black/20 backdrop-blur-md ring-1 ring-white/[0.03]",
+      "rounded-xl bg-card/70 text-card-foreground shadow-lg shadow-black/20 ring-1 ring-white/[0.03]",
       className
     )}
+    style={{
+      border: "1px solid rgba(255,255,255,var(--border-opacity, 0.12))",
+      backdropFilter: "blur(var(--card-blur, 12px))",
+      WebkitBackdropFilter: "blur(var(--card-blur, 12px))",
+      ...style,
+    }}
     {...props}
   />
 ))

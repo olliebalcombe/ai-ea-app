@@ -57,6 +57,11 @@ export async function POST(req: NextRequest) {
   const allQuestions = DEFAULT_QUESTIONS[client.vertical] || [];
   const questionsRemaining = allQuestions.filter((q) => !answeredQuestions.has(q));
 
+  const { data: knowledgeBase } = await supabaseAdmin
+    .from("knowledge_base_entries")
+    .select("category, title, content")
+    .eq("client_id", client.id);
+
   const systemPrompt = buildSystemPrompt({
     vertical: client.vertical,
     businessName: client.name,
@@ -64,11 +69,16 @@ export async function POST(req: NextRequest) {
     channel: "email",
     toneStyle: client.tone_style,
     businessNuances: client.business_nuances,
+    knowledgeBase,
   });
 
-  const { reply, extractedAnswer, escalation } = await runQualificationTurn({ systemPrompt, history, questionsRemaining });
+  const { reply, extractedAnswers, escalation } = await runQualificationTurn({ systemPrompt, history, questionsRemaining });
 
-  if (extractedAnswer) await supabaseAdmin.from("lead_answers").insert({ lead_id: lead.id, ...extractedAnswer });
+  if (extractedAnswers.length > 0) {
+    await supabaseAdmin
+      .from("lead_answers")
+      .insert(extractedAnswers.map((a) => ({ lead_id: lead.id, question: a.question, answer: a.answer })));
+  }
   if (escalation) await supabaseAdmin.from("leads").update({ status: "Qualified" }).eq("id", lead.id);
 
   await supabaseAdmin.from("lead_messages").insert({ lead_id: lead.id, sender: "ai", body: reply });

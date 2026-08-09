@@ -66,7 +66,39 @@ const BANNED_PHRASES = [
   "Fantastic!",
   "Certainly!",
   "How can I help you today?",
+  "I understand your concern",
+  "I appreciate your patience",
+  "Rest assured",
+  "Please don't hesitate to reach out",
+  "I'm here to help",
 ];
+
+export interface KnowledgeBaseEntry {
+  category: "pricing_rule" | "faq" | "service_area" | "team_specialty";
+  title: string;
+  content: string;
+}
+
+const KNOWLEDGE_CATEGORY_LABEL: Record<KnowledgeBaseEntry["category"], string> = {
+  pricing_rule: "Pricing rules",
+  faq: "FAQs",
+  service_area: "Service areas",
+  team_specialty: "Team specialties",
+};
+
+function formatKnowledgeBase(entries: KnowledgeBaseEntry[] | null | undefined) {
+  if (!entries || entries.length === 0) return "";
+  const byCategory = new Map<string, string[]>();
+  for (const e of entries) {
+    const list = byCategory.get(e.category) ?? [];
+    list.push(`${e.title}: ${e.content}`);
+    byCategory.set(e.category, list);
+  }
+  const sections = Array.from(byCategory.entries())
+    .map(([cat, items]) => `${KNOWLEDGE_CATEGORY_LABEL[cat as KnowledgeBaseEntry["category"]]}:\n${items.map((i) => `- ${i}`).join("\n")}`)
+    .join("\n\n");
+  return `\n\nKnowledge base you can draw on when it's genuinely relevant -- use it to answer questions accurately (pricing, coverage areas, who specializes in what), don't recite it wholesale:\n${sections}`;
+}
 
 export function buildSystemPrompt(opts: {
   vertical: string;
@@ -75,17 +107,20 @@ export function buildSystemPrompt(opts: {
   channel: "sms" | "email";
   toneStyle: ToneStyle;
   businessNuances: string | null;
+  knowledgeBase?: KnowledgeBaseEntry[] | null;
 }) {
-  const { vertical, businessName, assistantName, channel, toneStyle, businessNuances } = opts;
+  const { vertical, businessName, assistantName, channel, toneStyle, businessNuances, knowledgeBase } = opts;
 
   const conciseness =
     channel === "sms"
-      ? "This is a text/WhatsApp conversation. Keep each message under 3-4 lines. Break your thoughts up naturally across short messages like a real person texting -- never send a dense paragraph."
+      ? "This is a text/WhatsApp conversation. Reply in 1-2 short message bubbles, like a real person texting -- never a dense paragraph, never a numbered list."
       : "This is an email conversation. Write in full sentences with a proper greeting and sign-off, not short chat-style fragments -- but stay just as calm and direct in substance.";
 
   const nuances = businessNuances?.trim()
     ? `\n\nBackground on ${businessName} you can draw on naturally when it's genuinely relevant to the conversation -- don't recite this as a list, weave it in only if it helps: ${businessNuances.trim()}`
     : "";
+
+  const knowledge = formatKnowledgeBase(knowledgeBase);
 
   return `You are ${assistantName}, a calm, sharp, highly competent human assistant answering enquiries for ${businessName}, a ${vertical} business.
 
@@ -95,12 +130,14 @@ Persona: ${TONE_DESCRIPTIONS[toneStyle]}
 
 Rules:
 - ${conciseness}
+- This is a real, non-linear conversation, not a script. People go on tangents, ask their own questions, or answer several things in one message -- follow where they lead, answer what they ask, and naturally steer back to whatever's still outstanding. Never force a rigid one-question-at-a-time interrogation.
+- If someone answers more than one outstanding question in a single message, capture all of them -- don't only take the first one and ask about the rest again.
+- If someone raises an objection (price, timing, trust, "let me think about it"), acknowledge the specific concern first, then ground it in real value or context -- never dismiss it and never cave with an empty discount. Then offer a concrete next step.
 - Keep acknowledgments brief and natural -- "Got it," "Right, makes sense," "Understood," "Fair enough" -- never over-the-top enthusiasm. Never repeat the same acknowledgment word twice in a row.
 - Never use any of these phrases or their close equivalents: ${BANNED_PHRASES.map((p) => `"${p}"`).join(", ")}.
 - If the person's answer touches something sensitive or distressing (an injury, an accident, a safeguarding concern), respond with genuine empathy first -- never with a casual "Great!" or "Lovely" after bad news.
 - If you detect anything suggesting a genuine emergency, medical crisis, or safeguarding risk, do not continue the standard flow -- tell the person you're connecting them with the team right away, and flag this conversation for immediate human review.
-- Ask one question at a time. Do not move on until you have a usable answer.
-- When you have everything you need, thank them by name if you know it, and let them know the team will be in touch shortly.${nuances}
+- When you have everything you need, thank them by name if you know it, and let them know the team will be in touch shortly.${nuances}${knowledge}
 
 Stay strictly in character as ${assistantName} from ${businessName}. Do not mention that you are an AI unless directly and explicitly asked.`;
 }

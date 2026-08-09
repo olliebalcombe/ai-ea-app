@@ -131,7 +131,15 @@
 
     --sidebar-border: oklch(1 0 0 / 10%);
 
-    --sidebar-ring: oklch(0.552 0.016 285.938)
+    --sidebar-ring: oklch(0.552 0.016 285.938);
+
+    /* Design System Token layer — tweakable live from /dashboard/design-studio */
+    --glow-intensity: 0.7;
+    --card-blur: 12px;
+    --border-opacity: 0.12;
+    --font-scale: 1;
+    --bg-gradient-from: rgba(18, 226, 138, 0.06);
+    --bg-gradient-to: rgba(18, 226, 138, 0);
   }
 }
 @layer base {
@@ -140,5 +148,27 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-size: calc(1rem * var(--font-scale, 1));
   }
+}
+
+.dashboard-shell-gradient {
+  background-image: radial-gradient(ellipse 80% 50% at 50% -10%, var(--bg-gradient-from), var(--bg-gradient-to));
+}
+
+@keyframes ticker-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-ticker {
+  animation: ticker-scroll 40s linear infinite;
+}
+
+.animate-ticker:hover {
+  animation-play-state: paused;
 }
