@@ -21,6 +21,8 @@ export interface Client {
   tone_style: ToneStyle;
   business_nuances: string | null;
   theme_tokens: Record<string, unknown> | null;
+  enabled_skills: string[];
+  google_review_link: string | null;
 }
 
 export interface Staff {

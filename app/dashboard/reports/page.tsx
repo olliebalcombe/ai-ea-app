@@ -142,7 +142,7 @@ export default function ReportsPage() {
     <div>
       <h1 className="mb-6 text-2xl font-semibold tracking-tight text-foreground">Reports</h1>
 
-      <Card className="mb-6 flex items-center gap-4 border-amber-500/20 bg-gradient-to-br from-amber-500/[0.08] to-purple-500/[0.05] p-5">
+      <Card className="glow-ring mb-6 flex items-center gap-4 border-amber-500/20 bg-gradient-to-br from-amber-500/[0.08] to-purple-500/[0.05] p-5">
         <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-gradient-to-br from-amber-400 to-purple-500">
           <PoundSterling className="h-5 w-5 text-background" />
         </div>

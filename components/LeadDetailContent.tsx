@@ -8,6 +8,7 @@ import { waLink } from "@/lib/whatsapp";
 import { cn } from "@/lib/utils";
 import StatusBadge from "@/components/StatusBadge";
 import MarkLostDialog from "@/components/MarkLostDialog";
+import ViewportFrame from "@/components/ViewportFrame";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -68,12 +69,15 @@ export default function LeadDetailContent({
   const [uploading, setUploading] = useState(false);
   const [analyzingId, setAnalyzingId] = useState<string | null>(null);
   const [mediaError, setMediaError] = useState<string | null>(null);
+  const [analysisSkippedNote, setAnalysisSkippedNote] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [composeText, setComposeText] = useState("");
   const [sending, setSending] = useState(false);
   const [toolbarLoading, setToolbarLoading] = useState<string | null>(null);
   const [composeError, setComposeError] = useState<string | null>(null);
+
+  const [enabledSkills, setEnabledSkills] = useState<string[]>([]);
 
   const loadLead = useCallback(async () => {
     const { data, error } = await supabaseBrowser
@@ -137,6 +141,12 @@ export default function LeadDetailContent({
       .select("*")
       .eq("client_id", currentClientId)
       .then(({ data }) => setServicesList((data as Service[]) ?? []));
+    supabaseBrowser
+      .from("clients")
+      .select("enabled_skills")
+      .eq("id", currentClientId)
+      .single()
+      .then(({ data }) => setEnabledSkills((data?.enabled_skills as string[]) ?? []));
   }, [currentClientId]);
 
   async function updateStatus(status: LeadStatus, extra?: Partial<Lead>) {
@@ -151,6 +161,12 @@ export default function LeadDetailContent({
     }
     setLostDialogOpen(false);
     loadLead();
+
+    if (status === "Won" && enabledSkills.includes("google_reviews_booster")) {
+      fetch(`/api/leads/${lead.id}/request-review`, { method: "POST" })
+        .then(() => loadMessages())
+        .catch(() => {});
+    }
   }
 
   async function confirmLost(reason: string | null) {
@@ -196,6 +212,12 @@ export default function LeadDetailContent({
       if (insertError || !mediaRow) throw insertError ?? new Error("Failed to save media record");
 
       await loadMedia();
+
+      if (!enabledSkills.includes("vision_site_inspector")) {
+        setAnalysisSkippedNote("AI photo analysis is turned off — enable Vision Site Inspector in the Marketplace to turn this on.");
+        return;
+      }
+
       setAnalyzingId(mediaRow.id);
 
       const res = await fetch(`/api/leads/${lead.id}/analyze-photo`, {
@@ -357,7 +379,7 @@ export default function LeadDetailContent({
     <div>
       <div className="mb-6 flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+          <h1 className="font-serifDisplay text-3xl font-normal tracking-tight text-foreground">
             {lead.name ?? "Unknown"}
           </h1>
           <p className="text-sm text-muted-foreground">
@@ -393,7 +415,8 @@ export default function LeadDetailContent({
                   {messages.length === 0 ? (
                     <p className="text-sm text-muted-foreground">No messages yet.</p>
                   ) : (
-                    <div className="space-y-2 rounded-lg bg-black/25 p-4">
+                    <ViewportFrame title={lead.phone ?? lead.email ?? "Conversation"}>
+                    <div className="space-y-2 p-4">
                       {messages.map((m) => (
                         <div
                           key={m.id}
@@ -441,6 +464,7 @@ export default function LeadDetailContent({
                         </div>
                       ))}
                     </div>
+                    </ViewportFrame>
                   )}
 
                   <div className="space-y-2 border-t border-border pt-3">
@@ -460,7 +484,12 @@ export default function LeadDetailContent({
                         variant="outline"
                         className="h-7 text-xs"
                         onClick={draftQuote}
-                        disabled={toolbarLoading === "quote"}
+                        disabled={toolbarLoading === "quote" || !enabledSkills.includes("whatsapp_ballpark_estimator")}
+                        title={
+                          enabledSkills.includes("whatsapp_ballpark_estimator")
+                            ? undefined
+                            : "Enable WhatsApp Ballpark Estimator in the Marketplace to use this"
+                        }
                       >
                         <PoundSterling className="h-3 w-3" />
                         {toolbarLoading === "quote" ? "Drafting…" : "Draft Ballpark Quote"}
@@ -518,6 +547,7 @@ export default function LeadDetailContent({
                     {uploading ? "Uploading…" : "Upload site photo"}
                   </Button>
                   {mediaError && <p className="text-xs text-destructive">{mediaError}</p>}
+                  {analysisSkippedNote && <p className="text-xs text-muted-foreground">{analysisSkippedNote}</p>}
 
                   {media.length === 0 ? (
                     <p className="text-sm text-muted-foreground">No photos uploaded yet.</p>

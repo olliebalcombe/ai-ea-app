@@ -12,6 +12,8 @@ import {
   Calendar,
   BookOpen,
   Palette,
+  Store,
+  Clapperboard,
   Users,
   Wrench,
   ListChecks,
@@ -44,6 +46,8 @@ const NAV = [
   { href: "/dashboard/reports", label: "Reports", icon: FileBarChart },
   { href: "/dashboard/knowledge-base", label: "Knowledge Base", icon: BookOpen },
   { href: "/dashboard/design-studio", label: "Design Studio", icon: Palette },
+  { href: "/dashboard/marketplace", label: "Marketplace", icon: Store },
+  { href: "/dashboard/canvas", label: "Canvas", icon: Clapperboard },
 ];
 
 const SETTINGS_NAV = [

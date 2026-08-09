@@ -14,8 +14,10 @@ import {
   Activity,
 } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { motion } from "framer-motion";
 import { supabaseBrowser } from "@/lib/supabaseClient";
 import { useCurrentClient } from "@/lib/clientContext";
+import { staggerContainer, staggerItem } from "@/lib/motion";
 import StatCard from "@/components/StatCard";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -109,13 +111,13 @@ export default function DashboardOverviewPage() {
 
   return (
     <div>
-      <Card className="mb-6 border-amber-500/20 bg-gradient-to-br from-amber-500/[0.07] to-purple-500/[0.05] p-6">
+      <Card className="glow-ring mb-6 border-amber-500/20 bg-gradient-to-br from-amber-500/[0.07] to-purple-500/[0.05] p-6">
         <div className="mb-4 flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/20">
             <Sparkles className="h-4 w-4 text-amber-400" />
           </div>
           <div>
-            <div className="text-lg font-semibold text-foreground">Good morning.</div>
+            <div className="font-serifDisplay text-2xl font-normal text-foreground">Good morning.</div>
             <div className="text-xs text-muted-foreground">here&apos;s everything that needs your eyes right now</div>
           </div>
         </div>
@@ -189,13 +191,28 @@ export default function DashboardOverviewPage() {
         </Card>
       )}
 
-      <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-5">
-        <StatCard label="Total leads" value={leads.length} icon={Database} />
-        <StatCard label="New (7 days)" value={newThisWeek} icon={Sparkles} />
-        <StatCard label="Booked" value={bookedCount} icon={CalendarCheck} />
-        <StatCard label="Won" value={wonCount} icon={Trophy} />
-        <StatCard label="Revenue protected" value={formatPrice(revenue)} icon={PoundSterling} />
-      </div>
+      <motion.div
+        variants={staggerContainer}
+        initial="initial"
+        animate="animate"
+        className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-5"
+      >
+        <motion.div variants={staggerItem}>
+          <StatCard label="Total leads" value={leads.length} icon={Database} />
+        </motion.div>
+        <motion.div variants={staggerItem}>
+          <StatCard label="New (7 days)" value={newThisWeek} icon={Sparkles} />
+        </motion.div>
+        <motion.div variants={staggerItem}>
+          <StatCard label="Booked" value={bookedCount} icon={CalendarCheck} />
+        </motion.div>
+        <motion.div variants={staggerItem}>
+          <StatCard label="Won" value={wonCount} icon={Trophy} />
+        </motion.div>
+        <motion.div variants={staggerItem}>
+          <StatCard label="Revenue protected" value={formatPrice(revenue)} icon={PoundSterling} />
+        </motion.div>
+      </motion.div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card className="p-5">

@@ -140,6 +140,7 @@
     --font-scale: 1;
     --bg-gradient-from: rgba(18, 226, 138, 0.06);
     --bg-gradient-to: rgba(18, 226, 138, 0);
+    --primary-rgb: 18, 226, 138;
   }
 }
 @layer base {
@@ -153,7 +154,14 @@
 }
 
 .dashboard-shell-gradient {
-  background-image: radial-gradient(ellipse 80% 50% at 50% -10%, var(--bg-gradient-from), var(--bg-gradient-to));
+  background-image: radial-gradient(ellipse 60% 40% at 15% -10%, var(--bg-gradient-from), var(--bg-gradient-to)),
+    radial-gradient(ellipse 50% 35% at 85% 0%, var(--bg-gradient-from), var(--bg-gradient-to)),
+    radial-gradient(ellipse 70% 45% at 50% 100%, var(--bg-gradient-from), var(--bg-gradient-to));
+  background-repeat: no-repeat;
+}
+
+.glow-ring {
+  box-shadow: 0 0 40px -8px rgba(var(--primary-rgb, 18, 226, 138), calc(var(--glow-intensity, 0.7) * 0.5));
 }
 
 @keyframes ticker-scroll {
@@ -171,4 +179,19 @@
 
 .animate-ticker:hover {
   animation-play-state: paused;
+}
+
+@keyframes skill-gradient-shift {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.skill-thumb {
+  background-size: 200% 200%;
+  animation: skill-gradient-shift 8s ease-in-out infinite;
 }

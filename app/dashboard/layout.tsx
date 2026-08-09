@@ -6,6 +6,7 @@ import { SandboxProvider } from "@/lib/sandboxContext";
 import DashboardSidebar from "@/components/DashboardSidebar";
 import DashboardHeader from "@/components/DashboardHeader";
 import ThemeTokenLoader from "@/components/ThemeTokenLoader";
+import PageTransition from "@/components/PageTransition";
 import { Toaster } from "@/components/ui/sonner";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -33,7 +34,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <div className="flex flex-1 flex-col overflow-hidden">
             <DashboardHeader />
             <main className="flex-1 overflow-y-auto">
-              <div className="mx-auto max-w-6xl px-6 py-8">{children}</div>
+              <div className="mx-auto max-w-6xl px-6 py-8">
+                <PageTransition>{children}</PageTransition>
+              </div>
             </main>
           </div>
         </div>

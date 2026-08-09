@@ -24,6 +24,8 @@ const COMPONENT_PAGES = [
   { id: "reports", label: "Reports", href: "/dashboard/reports" },
   { id: "knowledge-base", label: "Knowledge Base", href: "/dashboard/knowledge-base" },
   { id: "design-studio", label: "Design Studio", href: "/dashboard/design-studio" },
+  { id: "marketplace", label: "Marketplace", href: "/dashboard/marketplace" },
+  { id: "canvas", label: "Canvas", href: "/dashboard/canvas" },
 ];
 
 /** Parses a raw "@..." fragment (no leading @) into a mention type + remaining search text. */

@@ -28,6 +28,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import MentionAutocomplete from "@/components/MentionAutocomplete";
+import ViewportFrame from "@/components/ViewportFrame";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -402,44 +403,48 @@ export default function SimulateLeadDrawer({
               AI Thought Stream
             </div>
 
-            {thoughtStream.slice(0, revealedCount).map((step, i) => (
-              <div key={i} className="space-y-2 rounded-lg border border-white/10 bg-secondary/20 p-3">
-                <div className="rounded-lg bg-black/20 px-3 py-2 text-sm text-foreground">
-                  &ldquo;{step.customerMessage}&rdquo;
-                </div>
+            <ViewportFrame title="AI Thought Stream — live">
+              <div className="space-y-2 p-3">
+                {thoughtStream.slice(0, revealedCount).map((step, i) => (
+                  <div key={i} className="space-y-2 rounded-lg border border-white/10 bg-secondary/20 p-3">
+                    <div className="rounded-lg bg-black/20 px-3 py-2 text-sm text-foreground">
+                      &ldquo;{step.customerMessage}&rdquo;
+                    </div>
 
-                {step.extractedAnswers.length > 0 && (
-                  <div className="space-y-1.5">
-                    {step.extractedAnswers.map((a, j) => (
-                      <div key={j} className="flex items-center gap-2 text-xs">
-                        <span className="w-28 shrink-0 truncate text-muted-foreground">{a.question}</span>
-                        <span className="flex-1 truncate text-foreground">{a.answer}</span>
-                        <div className="flex h-1.5 w-14 shrink-0 overflow-hidden rounded-full bg-white/10">
-                          <div
-                            className="h-full rounded-full bg-primary"
-                            style={{ width: `${Math.round(a.confidence * 100)}%` }}
-                          />
-                        </div>
-                        <span className="w-8 shrink-0 text-right text-[10px] text-muted-foreground">
-                          {Math.round(a.confidence * 100)}%
-                        </span>
+                    {step.extractedAnswers.length > 0 && (
+                      <div className="space-y-1.5">
+                        {step.extractedAnswers.map((a, j) => (
+                          <div key={j} className="flex items-center gap-2 text-xs">
+                            <span className="w-28 shrink-0 truncate text-muted-foreground">{a.question}</span>
+                            <span className="flex-1 truncate text-foreground">{a.answer}</span>
+                            <div className="flex h-1.5 w-14 shrink-0 overflow-hidden rounded-full bg-white/10">
+                              <div
+                                className="h-full rounded-full bg-primary"
+                                style={{ width: `${Math.round(a.confidence * 100)}%` }}
+                              />
+                            </div>
+                            <span className="w-8 shrink-0 text-right text-[10px] text-muted-foreground">
+                              {Math.round(a.confidence * 100)}%
+                            </span>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                )}
+                    )}
 
-                {step.escalation && (
-                  <div className="flex items-center gap-1.5 text-xs text-amber-400">
-                    <AlertTriangle className="h-3 w-3" /> Escalation flagged: {step.escalation}
-                  </div>
-                )}
+                    {step.escalation && (
+                      <div className="flex items-center gap-1.5 text-xs text-amber-400">
+                        <AlertTriangle className="h-3 w-3" /> Escalation flagged: {step.escalation}
+                      </div>
+                    )}
 
-                <div className="flex items-start gap-1.5 text-sm">
-                  <ArrowRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
-                  <span className="text-foreground">{step.aiReply}</span>
-                </div>
+                    <div className="flex items-start gap-1.5 text-sm">
+                      <ArrowRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+                      <span className="text-foreground">{step.aiReply}</span>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            </ViewportFrame>
 
             {revealedCount >= thoughtStream.length && draft && (
               <div className="flex items-center gap-2 pt-2">

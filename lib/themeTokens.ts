@@ -55,6 +55,14 @@ export const PRESETS: Record<string, { label: string; description: string; token
   },
 };
 
+function hexToRgbTriplet(hex: string): string | null {
+  const clean = hex.replace("#", "");
+  if (clean.length !== 6) return null;
+  const num = parseInt(clean, 16);
+  if (Number.isNaN(num)) return null;
+  return `${(num >> 16) & 0xff}, ${(num >> 8) & 0xff}, ${num & 0xff}`;
+}
+
 export function applyThemeTokens(tokens: Partial<ThemeTokens>) {
   const root = document.documentElement;
   if (tokens.glowIntensity != null) root.style.setProperty("--glow-intensity", String(tokens.glowIntensity));
@@ -66,5 +74,7 @@ export function applyThemeTokens(tokens: Partial<ThemeTokens>) {
   if (tokens.primary != null) {
     root.style.setProperty("--primary", tokens.primary);
     root.style.setProperty("--ring", tokens.primary);
+    const rgb = hexToRgbTriplet(tokens.primary);
+    if (rgb) root.style.setProperty("--primary-rgb", rgb);
   }
 }

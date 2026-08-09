@@ -2,8 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Search, Phone, MessageSquare, Mail, MessageCircle, ArrowRight, XCircle, UserCircle2, AlertTriangle } from "lucide-react";
+import { motion } from "framer-motion";
 import { supabaseBrowser } from "@/lib/supabaseClient";
 import { useCurrentClient } from "@/lib/clientContext";
+import { staggerContainer, staggerItem } from "@/lib/motion";
 import { waLink } from "@/lib/whatsapp";
 import MarkLostDialog from "@/components/MarkLostDialog";
 import LeadDetailContent from "@/components/LeadDetailContent";
@@ -180,15 +182,15 @@ export default function LeadQueuePage() {
                   <span className="text-sm font-semibold text-foreground">{status}</span>
                   <span className="text-xs text-muted-foreground">{col.length}</span>
                 </div>
-                <div className="flex flex-col gap-3">
+                <motion.div variants={staggerContainer} initial="initial" animate="animate" className="flex flex-col gap-3">
                   {col.map((lead) => {
                     const Icon = CHANNEL_ICON[lead.channel];
                     const badge = respBadge(lead.response_seconds);
                     const isFinal = lead.status === "Won";
                     const price = formatPrice(lead.price_pence);
                     return (
+                      <motion.div key={lead.id} variants={staggerItem}>
                       <Card
-                        key={lead.id}
                         onClick={() => setSelectedLeadId(lead.id)}
                         className="cursor-pointer p-3 hover:border-primary/30"
                       >
@@ -258,6 +260,7 @@ export default function LeadQueuePage() {
                           )}
                         </div>
                       </Card>
+                      </motion.div>
                     );
                   })}
                   {col.length === 0 && (
@@ -265,7 +268,7 @@ export default function LeadQueuePage() {
                       No leads at this stage
                     </div>
                   )}
-                </div>
+                </motion.div>
               </div>
             );
           })}

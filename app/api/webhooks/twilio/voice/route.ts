@@ -34,6 +34,14 @@ export async function POST(req: NextRequest) {
     .select()
     .single();
 
+  const skills: string[] = client.enabled_skills ?? [];
+  if (!skills.includes("voice_ai_receptionist")) {
+    // Voice AI Receptionist is disabled -- still capture the call as a lead (real CRM
+    // record), but skip the AI-authored text-back and don't claim one was sent.
+    const twiml = `<Response><Say voice="Polly.Amy">Thanks for calling ${client.name}. We can't take your call right now, but we've got your number and will get back to you shortly.</Say></Response>`;
+    return new NextResponse(twiml, { headers: { "Content-Type": "text/xml" } });
+  }
+
   const openingMessage = buildVoiceOpener({ assistantName: client.assistant_name, toneStyle: client.tone_style });
   await supabaseAdmin.from("lead_messages").insert({ lead_id: lead!.id, sender: "ai", body: openingMessage });
   await sendSms(from, openingMessage);

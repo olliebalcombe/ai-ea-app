@@ -50,9 +50,12 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/40 px-4">
       <div className="w-full max-w-sm">
-        <h1 className="mb-6 text-center text-2xl font-semibold tracking-tight text-foreground">
+        <h1 className="text-center font-serifDisplay text-4xl font-normal tracking-tight text-foreground">
           AI EA Dashboard
         </h1>
+        <p className="mb-6 text-center text-sm text-muted-foreground">
+          Never miss a lead — your AI front desk, answering and booking around the clock.
+        </p>
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Sign in</CardTitle>
@@ -95,7 +98,7 @@ export default function LoginPage() {
                 type="button"
                 variant="link"
                 onClick={handleForgotPassword}
-                className="w-full text-muted-foreground"
+                className="w-full text-primary hover:text-primary/80"
               >
                 Forgot password?
               </Button>
