@@ -9,6 +9,7 @@ import {
   XCircle,
   ClipboardList,
   FileBarChart,
+  Calendar,
   Users,
   Wrench,
   ListChecks,
@@ -37,6 +38,7 @@ const NAV = [
   { href: "/dashboard/leads", label: "Lead Queue", icon: Kanban },
   { href: "/dashboard/lost", label: "Lost Leads", icon: XCircle },
   { href: "/dashboard/bookings", label: "Bookings", icon: ClipboardList },
+  { href: "/dashboard/calendar", label: "Calendar", icon: Calendar },
   { href: "/dashboard/reports", label: "Reports", icon: FileBarChart },
 ];
 
@@ -90,10 +92,10 @@ export default function DashboardSidebar() {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors",
+                  "flex items-center gap-2 rounded-md border-l-2 px-3 py-2 text-sm transition-colors",
                   active
-                    ? "bg-secondary font-medium text-secondary-foreground"
-                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                    ? "border-primary bg-primary/10 font-medium text-primary"
+                    : "border-transparent text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                 )}
               >
                 <Icon className="h-4 w-4" />

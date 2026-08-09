@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { PoundSterling, Phone, MessageSquare, Mail } from "lucide-react";
+import { PoundSterling, Phone, MessageSquare, Mail, MessageCircle } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { supabaseBrowser } from "@/lib/supabaseClient";
 import { useCurrentClient } from "@/lib/clientContext";
+import { waLink } from "@/lib/whatsapp";
 import { Card } from "@/components/ui/card";
 import type { Lead, Service } from "@/types";
 
@@ -89,6 +90,15 @@ export default function LostLeadsPage() {
                       <div className="truncate text-sm font-medium text-foreground">{l.name ?? "Unknown"}</div>
                       <div className="truncate text-xs text-muted-foreground">{l.categories?.name ?? "—"}</div>
                     </div>
+                    {waLink(l.phone) && (
+                      <button
+                        onClick={() => window.open(waLink(l.phone)!, "_blank")}
+                        title="Open in WhatsApp"
+                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[#25D366]/25 bg-[#25D366]/10 text-[#25D366] hover:bg-[#25D366]/20"
+                      >
+                        <MessageCircle className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                     <span className="shrink-0 rounded-full border border-rose-500/25 bg-rose-500/10 px-2.5 py-1 text-[10.5px] text-rose-300">
                       {l.lost_reason || "No reason given"}
                     </span>

@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Phone, MessageSquare, Mail, ArrowRight, XCircle, UserCircle2 } from "lucide-react";
+import { Search, Phone, MessageSquare, Mail, MessageCircle, ArrowRight, XCircle, UserCircle2 } from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabaseClient";
 import { useCurrentClient } from "@/lib/clientContext";
+import { waLink } from "@/lib/whatsapp";
 import MarkLostDialog from "@/components/MarkLostDialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -178,6 +179,9 @@ export default function LeadQueuePage() {
                           {lead.name ?? "Unknown"}
                         </div>
                         <div className="mb-2 flex flex-wrap gap-1">
+                          <span className="flex items-center gap-1 rounded-full border border-[#25D366]/30 bg-[#25D366]/10 px-2 py-0.5 text-[10px] font-medium text-[#25D366]">
+                            <MessageCircle className="h-2.5 w-2.5" /> WhatsApp
+                          </span>
                           {lead.categories?.name && (
                             <span className="rounded-full border border-border px-2 py-0.5 text-[10px] text-muted-foreground">
                               {lead.categories.name}
@@ -194,27 +198,40 @@ export default function LeadQueuePage() {
                             <UserCircle2 className="h-3 w-3" /> {lead.staff.name}
                           </div>
                         )}
-                        {!isFinal && (
-                          <div className="flex gap-1.5" onClick={(e) => e.stopPropagation()}>
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              className="h-7 flex-1 text-xs"
-                              onClick={() => advance(lead)}
-                            >
-                              Advance <ArrowRight className="h-3 w-3" />
-                            </Button>
+                        <div className="flex gap-1.5" onClick={(e) => e.stopPropagation()}>
+                          {!isFinal && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                className="h-7 flex-1 text-xs"
+                                onClick={() => advance(lead)}
+                              >
+                                Advance <ArrowRight className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7"
+                                onClick={() => setLostTarget(lead)}
+                                title="Mark as lost"
+                              >
+                                <XCircle className="h-3.5 w-3.5 text-destructive" />
+                              </Button>
+                            </>
+                          )}
+                          {waLink(lead.phone) && (
                             <Button
                               size="icon"
                               variant="ghost"
                               className="h-7 w-7"
-                              onClick={() => setLostTarget(lead)}
-                              title="Mark as lost"
+                              onClick={() => window.open(waLink(lead.phone)!, "_blank")}
+                              title="Open in WhatsApp"
                             >
-                              <XCircle className="h-3.5 w-3.5 text-destructive" />
+                              <MessageCircle className="h-3.5 w-3.5 text-[#25D366]" />
                             </Button>
-                          </div>
-                        )}
+                          )}
+                        </div>
                       </Card>
                     );
                   })}

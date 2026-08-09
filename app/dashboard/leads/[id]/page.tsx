@@ -2,9 +2,10 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, MessageCircle } from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabaseClient";
 import { useCurrentClient } from "@/lib/clientContext";
+import { waLink } from "@/lib/whatsapp";
 import StatusBadge from "@/components/StatusBadge";
 import MarkLostDialog from "@/components/MarkLostDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -215,7 +216,19 @@ export default function LeadDetailPage({ params }: { params: { id: string } }) {
             {lead.phone ?? lead.email ?? "No contact info"}
           </p>
         </div>
-        <StatusBadge status={lead.status} />
+        <div className="flex items-center gap-2">
+          {waLink(lead.phone) && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5 border-[#25D366]/30 text-[#25D366] hover:bg-[#25D366]/10 hover:text-[#25D366]"
+              onClick={() => window.open(waLink(lead.phone)!, "_blank")}
+            >
+              <MessageCircle className="h-3.5 w-3.5" /> Open in WhatsApp
+            </Button>
+          )}
+          <StatusBadge status={lead.status} />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
@@ -228,19 +241,35 @@ export default function LeadDetailPage({ params }: { params: { id: string } }) {
               {messages.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No messages yet.</p>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-2 rounded-lg bg-black/20 p-4">
                   {messages.map((m) => (
                     <div
                       key={m.id}
-                      className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
-                        m.sender === "lead"
-                          ? "bg-muted text-foreground"
-                          : m.sender === "ai"
-                          ? "ml-auto bg-primary text-primary-foreground"
-                          : "mx-auto bg-amber-500/10 text-center text-amber-300"
+                      className={`flex ${
+                        m.sender === "system" ? "justify-center" : m.sender === "ai" ? "justify-end" : "justify-start"
                       }`}
                     >
-                      {m.body}
+                      <div
+                        className={`max-w-[75%] rounded-2xl px-3.5 py-2 text-sm ${
+                          m.sender === "lead"
+                            ? "rounded-bl-sm bg-secondary text-foreground"
+                            : m.sender === "ai"
+                            ? "rounded-br-sm bg-primary text-primary-foreground"
+                            : "bg-amber-500/10 text-center text-xs text-amber-300"
+                        }`}
+                      >
+                        {m.body}
+                        <div
+                          className={`mt-1 text-right text-[10px] ${
+                            m.sender === "ai" ? "text-primary-foreground/60" : "text-muted-foreground"
+                          }`}
+                        >
+                          {new Date(m.created_at).toLocaleTimeString("en-GB", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>

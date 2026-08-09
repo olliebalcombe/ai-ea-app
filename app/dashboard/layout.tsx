@@ -3,6 +3,8 @@ import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { supabaseAdmin } from "@/lib/supabase";
 import { ClientProvider, type ClientMembership } from "@/lib/clientContext";
 import DashboardSidebar from "@/components/DashboardSidebar";
+import DashboardHeader from "@/components/DashboardHeader";
+import { Toaster } from "@/components/ui/sonner";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = createSupabaseServerClient();
@@ -24,10 +26,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
     >
       <div className="flex h-screen bg-background">
         <DashboardSidebar />
-        <main className="flex-1 overflow-y-auto">
-          <div className="mx-auto max-w-6xl px-6 py-8">{children}</div>
-        </main>
+        <div className="flex flex-1 flex-col overflow-hidden">
+          <DashboardHeader />
+          <main className="flex-1 overflow-y-auto">
+            <div className="mx-auto max-w-6xl px-6 py-8">{children}</div>
+          </main>
+        </div>
       </div>
+      <Toaster />
     </ClientProvider>
   );
 }

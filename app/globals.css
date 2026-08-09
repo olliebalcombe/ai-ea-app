@@ -83,9 +83,9 @@
 
     --popover-foreground: oklch(0.985 0 0);
 
-    --primary: oklch(0.92 0.004 286.32);
+    --primary: #12e28a;
 
-    --primary-foreground: oklch(0.21 0.006 285.885);
+    --primary-foreground: #04140c;
 
     --secondary: oklch(0.274 0.006 286.033);
 
@@ -105,7 +105,7 @@
 
     --input: oklch(1 0 0 / 15%);
 
-    --ring: oklch(0.552 0.016 285.938);
+    --ring: #12e28a;
 
     --chart-1: oklch(0.871 0.006 286.286);
 

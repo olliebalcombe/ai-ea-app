@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ClipboardList, CalendarPlus } from "lucide-react";
+import { ClipboardList, CalendarPlus, MessageCircle } from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabaseClient";
 import { useCurrentClient } from "@/lib/clientContext";
+import { waLink } from "@/lib/whatsapp";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +26,7 @@ interface BookingRow {
   date: string;
   time: string;
   source: "AI EA" | "Manual";
+  phone: string | null;
 }
 
 function fmtGBP(pence: number) {
@@ -118,6 +120,7 @@ export default function BookingsPage() {
       date: l.booking_date ?? "—",
       time: l.booking_time ?? "—",
       source: "AI EA" as const,
+      phone: l.phone,
     })),
     ...manual.map((m) => ({
       id: m.id,
@@ -128,6 +131,7 @@ export default function BookingsPage() {
       date: m.booking_date ?? "—",
       time: m.booking_time ?? "—",
       source: "Manual" as const,
+      phone: null,
     })),
   ];
   const total = rows.reduce((sum, r) => sum + r.price, 0);
@@ -229,6 +233,15 @@ export default function BookingsPage() {
                     {b.time}
                   </div>
                 </div>
+                {waLink(b.phone) && (
+                  <button
+                    onClick={() => window.open(waLink(b.phone)!, "_blank")}
+                    title="Open in WhatsApp"
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[#25D366]/25 bg-[#25D366]/10 text-[#25D366] hover:bg-[#25D366]/20"
+                  >
+                    <MessageCircle className="h-3.5 w-3.5" />
+                  </button>
+                )}
                 <span
                   className={
                     b.source === "Manual"
