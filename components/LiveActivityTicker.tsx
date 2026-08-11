@@ -1,77 +1,49 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MessageSquare, CalendarCheck, AlertTriangle } from "lucide-react";
+import { Sparkles, AlertTriangle, CalendarCheck, MessageSquare, Bell, Star, Globe, type LucideIcon } from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabaseClient";
 import { useCurrentClient } from "@/lib/clientContext";
-
-interface ActivityItem {
-  id: string;
-  type: "message" | "booked" | "qualified";
-  label: string;
-  at: string;
-}
+import type { ActivityLogEntry, ActivityType } from "@/types";
 
 const POLL_MS = 20000;
 
+const ICON_FOR: Record<ActivityType, LucideIcon> = {
+  qualified: Sparkles,
+  escalated: AlertTriangle,
+  booked: CalendarCheck,
+  message_sent: MessageSquare,
+  reminder_sent: Bell,
+  review_requested: Star,
+  portal_action: Globe,
+};
+
+const COLOR_FOR: Record<ActivityType, string> = {
+  qualified: "text-primary",
+  escalated: "text-amber-400",
+  booked: "text-primary",
+  message_sent: "text-sky-400",
+  reminder_sent: "text-sky-400",
+  review_requested: "text-amber-400",
+  portal_action: "text-sky-400",
+};
+
 export default function LiveActivityTicker() {
   const { currentClientId } = useCurrentClient();
-  const [items, setItems] = useState<ActivityItem[]>([]);
+  const [items, setItems] = useState<ActivityLogEntry[]>([]);
 
   useEffect(() => {
     if (!currentClientId) return;
-
     let cancelled = false;
 
     async function load() {
-      const [{ data: messages }, { data: leads }] = await Promise.all([
-        supabaseBrowser
-          .from("lead_messages")
-          .select("id, sender, body, created_at, leads!inner(name, client_id)")
-          .eq("leads.client_id", currentClientId)
-          .order("created_at", { ascending: false })
-          .limit(8),
-        supabaseBrowser
-          .from("leads")
-          .select("id, name, status, updated_at")
-          .eq("client_id", currentClientId)
-          .in("status", ["Booked", "Qualified"])
-          .order("updated_at", { ascending: false })
-          .limit(6),
-      ]);
-
-      if (cancelled) return;
-
-      type MessageRow = {
-        id: string;
-        sender: "ai" | "lead" | "system";
-        created_at: string;
-        leads: { name: string | null } | null;
-      };
-      const messageItems: ActivityItem[] = ((messages as unknown as MessageRow[]) ?? []).map((m) => ({
-        id: `msg-${m.id}`,
-        type: "message",
-        label:
-          m.sender === "lead"
-            ? `${m.leads?.name ?? "A lead"} sent a message`
-            : m.sender === "ai"
-            ? `AI replied to ${m.leads?.name ?? "a lead"}`
-            : `System note on ${m.leads?.name ?? "a lead"}`,
-        at: m.created_at,
-      }));
-
-      const leadItems: ActivityItem[] = (leads ?? []).map((l) => ({
-        id: `lead-${l.id}`,
-        type: l.status === "Booked" ? "booked" : "qualified",
-        label: l.status === "Booked" ? `Booking confirmed: ${l.name ?? "Unknown"}` : `Escalated to team: ${l.name ?? "Unknown"}`,
-        at: l.updated_at,
-      }));
-
-      const merged = [...messageItems, ...leadItems]
-        .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
-        .slice(0, 12);
-
-      setItems(merged);
+      const { data } = await supabaseBrowser
+        .from("activity_log")
+        .select("*")
+        .eq("client_id", currentClientId)
+        .order("created_at", { ascending: false })
+        .limit(12);
+      if (!cancelled) setItems((data as ActivityLogEntry[]) ?? []);
     }
 
     load();
@@ -84,22 +56,17 @@ export default function LiveActivityTicker() {
 
   if (items.length === 0) return null;
 
-  const iconFor = (type: ActivityItem["type"]) =>
-    type === "message" ? MessageSquare : type === "booked" ? CalendarCheck : AlertTriangle;
-  const colorFor = (type: ActivityItem["type"]) =>
-    type === "message" ? "text-sky-400" : type === "booked" ? "text-green-400" : "text-amber-400";
-
   const loopItems = [...items, ...items];
 
   return (
     <div className="overflow-hidden border-t border-white/5 bg-background/40 py-1.5">
       <div className="animate-ticker flex w-max gap-8 whitespace-nowrap px-8">
         {loopItems.map((item, i) => {
-          const Icon = iconFor(item.type);
+          const Icon = ICON_FOR[item.type] ?? Sparkles;
           return (
             <span key={`${item.id}-${i}`} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Icon className={`h-3 w-3 ${colorFor(item.type)}`} />
-              {item.label}
+              <Icon className={`h-3 w-3 ${COLOR_FOR[item.type] ?? "text-muted-foreground"}`} />
+              {item.summary}
             </span>
           );
         })}

@@ -14,3 +14,6 @@ export const staggerItem: Variants = {
   initial: { opacity: 0, y: 12 },
   animate: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeOut" } },
 };
+
+/** Tactile hover feedback for interactive cards/buttons -- spread as a whileHover prop. */
+export const hoverLift = { y: -2, scale: 1.005, transition: { duration: 0.15, ease: "easeOut" } } as const;

@@ -3,6 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 import { supabaseAdmin } from "@/lib/supabase";
 import { sendSms } from "@/lib/twilio";
 import { sendEmail } from "@/lib/email";
+import { logActivity } from "@/lib/activityLog";
 
 /**
  * POST /api/leads/:id/request-review
@@ -76,6 +77,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     lead_id: leadId,
     sender: "system",
     body: "Review request sent automatically (Google Reviews Booster).",
+  });
+  await logActivity({
+    clientId: lead.client_id,
+    leadId,
+    type: "review_requested",
+    summary: `Review request sent to ${lead.name ?? "a lead"}`,
   });
 
   return NextResponse.json({ ok: true });

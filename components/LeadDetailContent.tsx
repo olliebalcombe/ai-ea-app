@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { MessageCircle, CheckCheck, ImagePlus, Sparkles, Send, CalendarClock, PoundSterling, Wand2 } from "lucide-react";
+import { MessageCircle, CheckCheck, ImagePlus, Sparkles, Send, CalendarClock, PoundSterling, Wand2, Bot, UserCog } from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabaseClient";
 import { useCurrentClient } from "@/lib/clientContext";
 import { waLink } from "@/lib/whatsapp";
@@ -9,8 +9,10 @@ import { cn } from "@/lib/utils";
 import StatusBadge from "@/components/StatusBadge";
 import MarkLostDialog from "@/components/MarkLostDialog";
 import ViewportFrame from "@/components/ViewportFrame";
+import QualificationScoreCard from "@/components/QualificationScoreCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
@@ -78,6 +80,7 @@ export default function LeadDetailContent({
   const [composeError, setComposeError] = useState<string | null>(null);
 
   const [enabledSkills, setEnabledSkills] = useState<string[]>([]);
+  const [pauseToggling, setPauseToggling] = useState(false);
 
   const loadLead = useCallback(async () => {
     const { data, error } = await supabaseBrowser
@@ -171,6 +174,14 @@ export default function LeadDetailContent({
 
   async function confirmLost(reason: string | null) {
     await updateStatus("Lost", { lost_reason: reason });
+  }
+
+  async function toggleAiPaused(next: boolean) {
+    if (!lead) return;
+    setPauseToggling(true);
+    const { error } = await supabaseBrowser.from("leads").update({ ai_paused: next }).eq("id", lead.id);
+    setPauseToggling(false);
+    if (!error) loadLead();
   }
 
   async function saveNotes() {
@@ -620,6 +631,29 @@ export default function LeadDetailContent({
         </div>
 
         <div className="space-y-6">
+          <Card>
+            <CardContent className="flex items-center justify-between gap-3 pt-6">
+              <div className="flex items-center gap-2">
+                {lead.ai_paused ? (
+                  <UserCog className="h-4 w-4" style={{ color: "rgb(var(--color-attention))" }} />
+                ) : (
+                  <Bot className="h-4 w-4 text-primary" />
+                )}
+                <div>
+                  <div className="text-sm font-medium text-foreground">
+                    {lead.ai_paused ? "You've taken over" : "AI is handling this conversation"}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground">
+                    {lead.ai_paused ? "Inbound replies wait for you — the AI won't respond" : "Toggle to take over and reply yourself"}
+                  </div>
+                </div>
+              </div>
+              <Switch checked={lead.ai_paused} disabled={pauseToggling} onCheckedChange={toggleAiPaused} />
+            </CardContent>
+          </Card>
+
+          <QualificationScoreCard lead={lead} messages={messages} photoCount={media.length} />
+
           <Card>
             <CardHeader>
               <CardTitle className="text-sm">Status</CardTitle>

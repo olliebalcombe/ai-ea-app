@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { sendEmail } from "@/lib/email";
 import { runQualificationTurn, ConversationTurn } from "@/lib/anthropic";
-import { buildSystemPrompt, DEFAULT_QUESTIONS } from "@/lib/prompts";
+import { buildSystemPrompt, buildFlooringStructuredTool, DEFAULT_QUESTIONS } from "@/lib/prompts";
+import { logActivity } from "@/lib/activityLog";
 
 /**
  * Inbound email webhook. The exact payload shape depends on your provider's
@@ -41,6 +42,16 @@ export async function POST(req: NextRequest) {
 
   await supabaseAdmin.from("lead_messages").insert({ lead_id: lead.id, sender: "lead", body: text });
 
+  if (lead.ai_paused) {
+    await logActivity({
+      clientId: client.id,
+      leadId: lead.id,
+      type: "message_sent",
+      summary: `New message from ${lead.name ?? "a lead"} — you've taken over this conversation`,
+    });
+    return NextResponse.json({ ok: true, paused: true });
+  }
+
   const { data: pastMessages } = await supabaseAdmin
     .from("lead_messages")
     .select("*")
@@ -72,14 +83,30 @@ export async function POST(req: NextRequest) {
     knowledgeBase,
   });
 
-  const { reply, extractedAnswers, escalation } = await runQualificationTurn({ systemPrompt, history, questionsRemaining });
+  const { reply, extractedAnswers, escalation, structuredFields } = await runQualificationTurn({
+    systemPrompt,
+    history,
+    questionsRemaining,
+    structuredTool: client.vertical === "Flooring" ? buildFlooringStructuredTool() : undefined,
+  });
 
   if (extractedAnswers.length > 0) {
     await supabaseAdmin
       .from("lead_answers")
       .insert(extractedAnswers.map((a) => ({ lead_id: lead.id, question: a.question, answer: a.answer })));
   }
-  if (escalation) await supabaseAdmin.from("leads").update({ status: "Qualified" }).eq("id", lead.id);
+  if (structuredFields) {
+    await supabaseAdmin.from("leads").update(structuredFields).eq("id", lead.id);
+  }
+  if (escalation) {
+    await supabaseAdmin.from("leads").update({ status: "Qualified" }).eq("id", lead.id);
+    await logActivity({ clientId: client.id, leadId: lead.id, type: "escalated", summary: `Escalated ${lead.name ?? "a lead"} — ${escalation}` });
+  }
+  const stillRemaining = questionsRemaining.filter((q) => !extractedAnswers.some((a) => a.question === q));
+  if (stillRemaining.length === 0 && extractedAnswers.length > 0) {
+    await supabaseAdmin.from("leads").update({ status: "Qualified" }).eq("id", lead.id);
+    await logActivity({ clientId: client.id, leadId: lead.id, type: "qualified", summary: `AI qualified ${lead.name ?? "a lead"}` });
+  }
 
   await supabaseAdmin.from("lead_messages").insert({ lead_id: lead.id, sender: "ai", body: reply });
   await sendEmail(from, `Re: Your enquiry to ${client.name}`, reply, client.assistant_name);

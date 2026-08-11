@@ -93,7 +93,7 @@
 
     --muted: oklch(0.274 0.006 286.033);
 
-    --muted-foreground: oklch(0.705 0.015 286.067);
+    --muted-foreground: oklch(0.76 0.015 286.067);
 
     --accent: oklch(0.274 0.006 286.033);
 
@@ -141,6 +141,13 @@
     --bg-gradient-from: rgba(18, 226, 138, 0.06);
     --bg-gradient-to: rgba(18, 226, 138, 0);
     --primary-rgb: 18, 226, 138;
+
+    /* Semantic action colors for the Morning Briefing / Approval Queue / Leakage
+       UI -- distinct from StatusBadge's pipeline-stage colors, which stay as-is. */
+    --color-attention: 245, 158, 11; /* amber -- needs a decision */
+    --color-risk: 239, 68, 68; /* coral/red -- at risk, revenue leakage */
+    --color-ai: 168, 85, 247; /* violet -- AI-drafted/generated */
+    --color-info: 148, 163, 184; /* slate -- informational */
   }
 }
 @layer base {
@@ -162,6 +169,15 @@
 
 .glow-ring {
   box-shadow: 0 0 40px -8px rgba(var(--primary-rgb, 18, 226, 138), calc(var(--glow-intensity, 0.7) * 0.5));
+}
+
+.glow-hover {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.glow-hover:hover {
+  border-color: rgba(var(--primary-rgb, 18, 226, 138), 0.3);
+  box-shadow: 0 0 20px rgba(var(--primary-rgb, 18, 226, 138), calc(var(--glow-intensity, 0.7) * 0.17));
 }
 
 @keyframes ticker-scroll {

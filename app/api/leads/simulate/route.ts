@@ -181,6 +181,7 @@ export async function POST(req: NextRequest) {
         response_seconds: respSeconds(),
         booking_date: bookingDate,
         booking_time: isBookable ? "10:00" : null,
+        booking_source: isBookable ? "simulated" : null,
         notes: isEscalate
           ? `⚠️ High Priority — flagged for manual team takeover (simulated)${escalationReason ? `: ${escalationReason}` : ""}`
           : isCustom
@@ -254,6 +255,7 @@ export async function POST(req: NextRequest) {
         response_seconds: respSeconds(),
         booking_date: newDate,
         booking_time: "14:00",
+        booking_source: "simulated",
       },
       messages: [
         { sender: "lead", body: `Hi, I need to move my appointment on ${oldDate} if possible.` },
@@ -328,6 +330,7 @@ export async function POST(req: NextRequest) {
       response_seconds: respSeconds(),
       booking_date: newDate,
       booking_time: "14:00",
+      booking_source: "simulated",
     })
     .select()
     .single();

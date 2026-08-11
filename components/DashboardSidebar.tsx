@@ -11,6 +11,7 @@ import {
   FileBarChart,
   Calendar,
   BookOpen,
+  ShieldAlert,
   Palette,
   Store,
   Clapperboard,
@@ -18,9 +19,12 @@ import {
   Wrench,
   ListChecks,
   Bell,
+  Sparkles,
+  Activity,
   ChevronsUpDown,
   LogOut,
   Check,
+  type LucideIcon,
 } from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabaseClient";
 import { useCurrentClient } from "@/lib/clientContext";
@@ -36,25 +40,51 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-const NAV = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/dashboard/messages", label: "Messages", icon: Inbox },
-  { href: "/dashboard/leads", label: "Lead Queue", icon: Kanban },
-  { href: "/dashboard/lost", label: "Lost Leads", icon: XCircle },
-  { href: "/dashboard/bookings", label: "Bookings", icon: ClipboardList },
-  { href: "/dashboard/calendar", label: "Calendar", icon: Calendar },
-  { href: "/dashboard/reports", label: "Reports", icon: FileBarChart },
-  { href: "/dashboard/knowledge-base", label: "Knowledge Base", icon: BookOpen },
-  { href: "/dashboard/design-studio", label: "Design Studio", icon: Palette },
-  { href: "/dashboard/marketplace", label: "Marketplace", icon: Store },
-  { href: "/dashboard/canvas", label: "Canvas", icon: Clapperboard },
-];
+interface NavItem {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+}
 
-const SETTINGS_NAV = [
-  { href: "/dashboard/settings/staff", label: "Staff", icon: Users },
-  { href: "/dashboard/settings/services", label: "Services", icon: Wrench },
-  { href: "/dashboard/settings/questions", label: "Questions", icon: ListChecks },
-  { href: "/dashboard/settings/notifications", label: "Notifications", icon: Bell },
+const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
+  {
+    label: "Work",
+    items: [
+      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/dashboard/messages", label: "Inbox", icon: Inbox },
+      { href: "/dashboard/leads", label: "Lead Queue", icon: Kanban },
+      { href: "/dashboard/lost", label: "Lost Leads", icon: XCircle },
+    ],
+  },
+  {
+    label: "Operations",
+    items: [
+      { href: "/dashboard/bookings", label: "Bookings", icon: ClipboardList },
+      { href: "/dashboard/calendar", label: "Calendar", icon: Calendar },
+      { href: "/dashboard/reports", label: "Reports", icon: FileBarChart },
+    ],
+  },
+  {
+    label: "Improve",
+    items: [
+      { href: "/dashboard/activity", label: "Assistant Activity", icon: Activity },
+      { href: "/dashboard/knowledge-base", label: "Knowledge Base", icon: BookOpen },
+      { href: "/dashboard/business-rules", label: "Business Rules", icon: ShieldAlert },
+      { href: "/dashboard/settings/questions", label: "Questions", icon: ListChecks },
+    ],
+  },
+  {
+    label: "Business",
+    items: [
+      { href: "/dashboard/design-studio", label: "Design Studio", icon: Palette },
+      { href: "/dashboard/marketplace", label: "Marketplace", icon: Store },
+      { href: "/dashboard/canvas", label: "Canvas", icon: Clapperboard },
+      { href: "/dashboard/settings/staff", label: "Staff", icon: Users },
+      { href: "/dashboard/settings/services", label: "Services", icon: Wrench },
+      { href: "/dashboard/settings/ai", label: "AI Settings", icon: Sparkles },
+      { href: "/dashboard/settings/notifications", label: "Notifications", icon: Bell },
+    ],
+  },
 ];
 
 function initials(name: string) {
@@ -87,58 +117,38 @@ export default function DashboardSidebar() {
       </div>
       <Separator />
 
-      <nav className="flex-1 space-y-4 px-3 py-4">
-        <div className="space-y-1">
-          {NAV.map((item) => {
-            const active =
-              item.href === "/dashboard"
-                ? pathname === "/dashboard"
-                : pathname === item.href || pathname?.startsWith(item.href + "/");
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "flex items-center gap-2 rounded-md border-l-2 px-3 py-2 text-sm transition-colors",
-                  active
-                    ? "border-primary bg-primary/10 font-medium text-primary"
-                    : "border-transparent text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                )}
-              >
-                <Icon className="h-4 w-4" />
-                {item.label}
-              </Link>
-            );
-          })}
-        </div>
-
-        <div>
-          <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Settings
-          </p>
-          <div className="space-y-1">
-            {SETTINGS_NAV.map((item) => {
-              const active = pathname === item.href;
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    "flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors",
-                    active
-                      ? "bg-secondary font-medium text-secondary-foreground"
-                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                  )}
-                >
-                  <Icon className="h-4 w-4" />
-                  {item.label}
-                </Link>
-              );
-            })}
+      <nav className="flex-1 space-y-4 overflow-y-auto px-3 py-4">
+        {NAV_GROUPS.map((group) => (
+          <div key={group.label}>
+            <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              {group.label}
+            </p>
+            <div className="space-y-1">
+              {group.items.map((item) => {
+                const active =
+                  item.href === "/dashboard"
+                    ? pathname === "/dashboard"
+                    : pathname === item.href || pathname?.startsWith(item.href + "/");
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                      "flex items-center gap-2 rounded-md border-l-2 px-3 py-2 text-sm transition-colors",
+                      active
+                        ? "border-primary bg-primary/10 font-medium text-primary"
+                        : "border-transparent text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                    )}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        ))}
       </nav>
 
       <Separator />

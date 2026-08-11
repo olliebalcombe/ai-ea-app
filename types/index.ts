@@ -1,9 +1,12 @@
 // Core shared types — mirrors the Supabase schema in supabase/schema.sql
 
-export type Vertical = "Tradie" | "Law Firm" | "Clinic" | "Estate Agent" | string;
+export type Vertical = "Flooring" | "Tradie" | "Law Firm" | "Clinic" | "Estate Agent" | string;
 export type Channel = "call" | "sms" | "email";
 export type LeadStatus = "New" | "Contacted" | "Qualified" | "Booked" | "Won" | "Lost";
 export type ToneStyle = "calm_direct" | "warm_friendly" | "formal_executive";
+export type BudgetFit = "strong" | "moderate" | "weak" | "unknown";
+export type InstallTimeline = "within_30_days" | "1_3_months" | "flexible" | "unknown";
+export type BuyingIntent = "high" | "medium" | "low";
 
 export interface Client {
   id: string;
@@ -69,9 +72,20 @@ export interface Lead {
   lost_reason: string | null;
   booking_date: string | null;
   booking_time: string | null;
+  booking_source: "staff" | "customer_portal" | "simulated" | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
+  room_type: string | null;
+  flooring_type: string | null;
+  area_sqm: number | null;
+  postcode: string | null;
+  budget_fit: BudgetFit | null;
+  install_timeline: InstallTimeline | null;
+  buying_intent: BuyingIntent | null;
+  discount_requested: boolean;
+  ai_paused: boolean;
+  quote_approved_at: string | null;
 }
 
 export interface LeadMessage {
@@ -140,7 +154,7 @@ export interface LeadMedia {
   created_at: string;
 }
 
-export type KnowledgeCategory = "pricing_rule" | "faq" | "service_area" | "team_specialty";
+export type KnowledgeCategory = "pricing_rule" | "faq" | "service_area" | "team_specialty" | "business_rule";
 
 export interface KnowledgeBaseEntry {
   id: string;
@@ -149,4 +163,43 @@ export interface KnowledgeBaseEntry {
   title: string;
   content: string;
   created_at: string;
+}
+
+export type ActivityType =
+  | "qualified"
+  | "escalated"
+  | "booked"
+  | "message_sent"
+  | "reminder_sent"
+  | "review_requested"
+  | "portal_action";
+
+export interface ActivityLogEntry {
+  id: string;
+  client_id: string;
+  lead_id: string | null;
+  type: ActivityType;
+  summary: string;
+  created_at: string;
+}
+
+export type SuggestionType =
+  | "follow_up_reminder"
+  | "site_visit_offer"
+  | "high_value_review"
+  | "weekend_slot_review"
+  | "discount_approval";
+
+export type SuggestionStatus = "pending" | "approved" | "dismissed";
+
+export interface LeadSuggestion {
+  id: string;
+  client_id: string;
+  lead_id: string;
+  type: SuggestionType;
+  reason: string;
+  suggested_message: string | null;
+  status: SuggestionStatus;
+  created_at: string;
+  resolved_at: string | null;
 }

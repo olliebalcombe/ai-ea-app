@@ -5,7 +5,7 @@ import { Search, Phone, MessageSquare, Mail, MessageCircle, ArrowRight, XCircle,
 import { motion } from "framer-motion";
 import { supabaseBrowser } from "@/lib/supabaseClient";
 import { useCurrentClient } from "@/lib/clientContext";
-import { staggerContainer, staggerItem } from "@/lib/motion";
+import { staggerContainer, staggerItem, hoverLift } from "@/lib/motion";
 import { waLink } from "@/lib/whatsapp";
 import MarkLostDialog from "@/components/MarkLostDialog";
 import LeadDetailContent from "@/components/LeadDetailContent";
@@ -189,10 +189,10 @@ export default function LeadQueuePage() {
                     const isFinal = lead.status === "Won";
                     const price = formatPrice(lead.price_pence);
                     return (
-                      <motion.div key={lead.id} variants={staggerItem}>
+                      <motion.div key={lead.id} variants={staggerItem} whileHover={hoverLift}>
                       <Card
                         onClick={() => setSelectedLeadId(lead.id)}
-                        className="cursor-pointer p-3 hover:border-primary/30"
+                        className="glow-hover cursor-pointer p-3"
                       >
                         <div className="mb-2 flex items-center justify-between">
                           <div className="flex items-center gap-1.5">

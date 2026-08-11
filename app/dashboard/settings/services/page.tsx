@@ -1,13 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import { Pencil, Trash2 } from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabaseClient";
 import { useCurrentClient } from "@/lib/clientContext";
+import { staggerContainer, staggerItem, hoverLift } from "@/lib/motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import {
   Select,
   SelectContent,
@@ -143,7 +144,7 @@ export default function ServicesSettingsPage() {
       {[...categories, ...(uncategorised.length > 0 ? [null] : [])].map((cat) => {
         const catServices = cat ? services.filter((s) => s.category_id === cat.id) : uncategorised;
         return (
-          <Card key={cat ? cat.id : "uncategorised"}>
+          <Card key={cat ? cat.id : "uncategorised"} className="glow-hover">
             <CardHeader className="flex-row items-center justify-between space-y-0">
               {cat && editingCategoryId === cat.id ? (
                 <div className="flex flex-1 items-center gap-2">
@@ -181,62 +182,52 @@ export default function ServicesSettingsPage() {
                 </>
               )}
             </CardHeader>
-            <CardContent className="p-0">
+            <CardContent className="px-4 pb-4 pt-0">
               {catServices.length === 0 ? (
-                <p className="px-6 pb-4 text-sm text-muted-foreground">No services yet.</p>
+                <p className="px-2 pb-2 text-sm text-muted-foreground">No services yet.</p>
               ) : (
-                <Table>
-                  <TableBody>
-                    {catServices.map((s) => (
-                      <TableRow key={s.id}>
-                        {editingServiceId === s.id ? (
-                          <>
-                            <TableCell>
-                              <Input
-                                value={editService.name}
-                                onChange={(e) =>
-                                  setEditService((v) => ({ ...v, name: e.target.value }))
-                                }
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Input
-                                value={editService.price}
-                                onChange={(e) =>
-                                  setEditService((v) => ({ ...v, price: e.target.value }))
-                                }
-                                className="w-24"
-                              />
-                            </TableCell>
-                            <TableCell className="space-x-2 whitespace-nowrap text-right">
-                              <Button size="sm" onClick={() => saveService(s.id)}>
-                                Save
-                              </Button>
-                              <Button size="sm" variant="ghost" onClick={() => setEditingServiceId(null)}>
-                                Cancel
-                              </Button>
-                            </TableCell>
-                          </>
-                        ) : (
-                          <>
-                            <TableCell className="text-foreground">{s.name}</TableCell>
-                            <TableCell className="text-muted-foreground">
-                              {formatPrice(s.price_pence)}
-                            </TableCell>
-                            <TableCell className="space-x-1 whitespace-nowrap text-right">
-                              <Button size="icon" variant="ghost" onClick={() => startEditService(s)}>
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button size="icon" variant="ghost" onClick={() => removeService(s.id)}>
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </TableCell>
-                          </>
-                        )}
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                <motion.div variants={staggerContainer} initial="initial" animate="animate" className="flex flex-wrap gap-2">
+                  {catServices.map((s) =>
+                    editingServiceId === s.id ? (
+                      <div key={s.id} className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/20 p-2">
+                        <Input
+                          value={editService.name}
+                          onChange={(e) => setEditService((v) => ({ ...v, name: e.target.value }))}
+                          className="h-8 w-32 text-xs"
+                        />
+                        <Input
+                          value={editService.price}
+                          onChange={(e) => setEditService((v) => ({ ...v, price: e.target.value }))}
+                          className="h-8 w-20 text-xs"
+                        />
+                        <Button size="sm" className="h-7 text-xs" onClick={() => saveService(s.id)}>
+                          Save
+                        </Button>
+                        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setEditingServiceId(null)}>
+                          Cancel
+                        </Button>
+                      </div>
+                    ) : (
+                      <motion.div
+                        key={s.id}
+                        variants={staggerItem}
+                        whileHover={hoverLift}
+                        className="group glow-hover flex items-center gap-2 rounded-full border border-white/10 bg-black/20 py-1.5 pl-3 pr-1.5"
+                      >
+                        <span className="text-sm text-foreground">{s.name}</span>
+                        <span className="text-sm font-semibold text-primary">{formatPrice(s.price_pence)}</span>
+                        <div className="flex opacity-0 transition-opacity group-hover:opacity-100">
+                          <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => startEditService(s)}>
+                            <Pencil className="h-3 w-3" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => removeService(s.id)}>
+                            <Trash2 className="h-3 w-3 text-destructive" />
+                          </Button>
+                        </div>
+                      </motion.div>
+                    )
+                  )}
+                </motion.div>
               )}
             </CardContent>
           </Card>

@@ -27,6 +27,7 @@ export default function KnowledgeBasePage() {
     faq: { title: "", content: "" },
     service_area: { title: "", content: "" },
     team_specialty: { title: "", content: "" },
+    business_rule: { title: "", content: "" },
   });
 
   const load = useCallback(async () => {

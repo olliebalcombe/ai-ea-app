@@ -2,16 +2,57 @@
 // This is where the "personality" and tone rules from the prototype live for real.
 
 import type { ToneStyle } from "@/types";
+import type { StructuredToolDef } from "@/lib/anthropic";
 
 export const DEFAULT_QUESTIONS: Record<string, string[]> = {
+  Flooring: ["Room type", "Flooring type", "Approx area", "Postcode", "Install timeline", "Budget range"],
   Tradie: ["Job type", "Location", "Urgency", "Budget range"],
   "Law Firm": ["Case type", "Date of incident", "Injury?", "Represented already?"],
   Clinic: ["Service wanted", "Preferred time", "New or returning client?"],
   "Estate Agent": ["Property of interest", "Timeline", "Financing status"],
 };
 
+/**
+ * Vertical-specific structured extraction, captured via an extra Claude tool
+ * alongside the generic record_answers tool -- flooring is the first
+ * vertical to get this; future verticals follow the same pattern.
+ */
+export function buildFlooringStructuredTool(): StructuredToolDef {
+  return {
+    name: "record_flooring_profile",
+    description:
+      "Call this whenever the conversation reveals or updates structured flooring-job details -- fill in only the fields you've actually learned, omit the rest. Can be called multiple times as more details emerge.",
+    input_schema: {
+      type: "object",
+      properties: {
+        room_type: { type: "string", description: "e.g. living room, kitchen, whole house" },
+        flooring_type: { type: "string", description: "e.g. engineered oak, LVT, carpet" },
+        area_sqm: { type: "number", description: "Approximate area in square metres" },
+        postcode: { type: "string" },
+        budget_fit: {
+          type: "string",
+          enum: ["strong", "moderate", "weak", "unknown"],
+          description: "Your honest read on whether their stated budget realistically fits the likely cost",
+        },
+        install_timeline: { type: "string", enum: ["within_30_days", "1_3_months", "flexible", "unknown"] },
+        buying_intent: {
+          type: "string",
+          enum: ["high", "medium", "low"],
+          description: "Your honest read of how ready this person is to actually buy, based on specificity, urgency, and engagement -- not a default guess",
+        },
+        discount_requested: { type: "boolean", description: "True if they asked for a discount or price reduction in this message" },
+      },
+    },
+  };
+}
+
 // Natural phrasing per question, so the AI never reads like a form
 export const PHRASING: Record<string, string> = {
+  "Room type": "Which room (or rooms) are we talking about?",
+  "Flooring type": "Did you have a flooring type in mind, or want some options?",
+  "Approx area": "Roughly how big an area are we covering?",
+  Postcode: "What's the postcode for the job?",
+  "Install timeline": "When were you hoping to get this installed?",
   "Job type": "What's the job you need sorting?",
   Location: "Whereabouts are you based?",
   Urgency: "How soon do you need this done?",
@@ -74,7 +115,7 @@ const BANNED_PHRASES = [
 ];
 
 export interface KnowledgeBaseEntry {
-  category: "pricing_rule" | "faq" | "service_area" | "team_specialty";
+  category: "pricing_rule" | "faq" | "service_area" | "team_specialty" | "business_rule";
   title: string;
   content: string;
 }
@@ -84,20 +125,32 @@ const KNOWLEDGE_CATEGORY_LABEL: Record<KnowledgeBaseEntry["category"], string> =
   faq: "FAQs",
   service_area: "Service areas",
   team_specialty: "Team specialties",
+  business_rule: "Hard rules",
 };
 
 function formatKnowledgeBase(entries: KnowledgeBaseEntry[] | null | undefined) {
   if (!entries || entries.length === 0) return "";
-  const byCategory = new Map<string, string[]>();
-  for (const e of entries) {
-    const list = byCategory.get(e.category) ?? [];
-    list.push(`${e.title}: ${e.content}`);
-    byCategory.set(e.category, list);
+
+  const rules = entries.filter((e) => e.category === "business_rule");
+  const soft = entries.filter((e) => e.category !== "business_rule");
+
+  let out = "";
+  if (soft.length > 0) {
+    const byCategory = new Map<string, string[]>();
+    for (const e of soft) {
+      const list = byCategory.get(e.category) ?? [];
+      list.push(`${e.title}: ${e.content}`);
+      byCategory.set(e.category, list);
+    }
+    const sections = Array.from(byCategory.entries())
+      .map(([cat, items]) => `${KNOWLEDGE_CATEGORY_LABEL[cat as KnowledgeBaseEntry["category"]]}:\n${items.map((i) => `- ${i}`).join("\n")}`)
+      .join("\n\n");
+    out += `\n\nKnowledge base you can draw on when it's genuinely relevant -- use it to answer questions accurately (pricing, coverage areas, who specializes in what), don't recite it wholesale:\n${sections}`;
   }
-  const sections = Array.from(byCategory.entries())
-    .map(([cat, items]) => `${KNOWLEDGE_CATEGORY_LABEL[cat as KnowledgeBaseEntry["category"]]}:\n${items.map((i) => `- ${i}`).join("\n")}`)
-    .join("\n\n");
-  return `\n\nKnowledge base you can draw on when it's genuinely relevant -- use it to answer questions accurately (pricing, coverage areas, who specializes in what), don't recite it wholesale:\n${sections}`;
+  if (rules.length > 0) {
+    out += `\n\nHard rules -- you must never violate these, even if the customer pushes back, negotiates, or asks nicely. If a request would require breaking one (e.g. a bigger discount than allowed), acknowledge it warmly but hold the line, and flag it for the team instead:\n${rules.map((r) => `- ${r.title}: ${r.content}`).join("\n")}`;
+  }
+  return out;
 }
 
 export function buildSystemPrompt(opts: {

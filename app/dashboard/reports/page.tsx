@@ -31,7 +31,13 @@ const HOUR_BUCKETS = [
   { label: "9pm+", from: 21, to: 24 },
 ];
 
-const BAR_COLORS = ["#fbbf24", "#c084fc", "#4ade80", "#fb923c", "#60a5fa"];
+// Derived from the client's own --primary-rgb (set by Design Studio) at
+// varying opacity, rather than hardcoded hues, so this actually follows
+// whatever theme/preset the business has picked instead of ignoring it.
+const BAR_OPACITIES = [1, 0.75, 0.55, 0.4, 0.28];
+function barColor(i: number) {
+  return `rgba(var(--primary-rgb, 18, 226, 138), ${BAR_OPACITIES[i % BAR_OPACITIES.length]})`;
+}
 
 function fmtGBP(pence: number) {
   return `£${Math.round(pence / 100).toLocaleString("en-GB")}`;
@@ -193,7 +199,7 @@ export default function ReportsPage() {
       )}
 
       <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card className="p-5">
+        <Card className="glow-hover p-5">
           <div className="mb-4 text-sm font-semibold text-foreground">Leads by job type</div>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={byCategory}>
@@ -203,14 +209,14 @@ export default function ReportsPage() {
               <Tooltip {...chartTooltip} cursor={{ fill: "hsl(var(--muted))" }} />
               <Bar dataKey="count" radius={[6, 6, 0, 0]}>
                 {byCategory.map((c, i) => (
-                  <Cell key={c.category} fill={BAR_COLORS[i % BAR_COLORS.length]} />
+                  <Cell key={c.category} fill={barColor(i)} />
                 ))}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
         </Card>
 
-        <Card className="p-5">
+        <Card className="glow-hover p-5">
           <div className="mb-4 text-sm font-semibold text-foreground">Bookings by team member</div>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={byStaff}>
@@ -218,14 +224,14 @@ export default function ReportsPage() {
               <XAxis dataKey="staff" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
               <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} allowDecimals={false} />
               <Tooltip {...chartTooltip} cursor={{ fill: "hsl(var(--muted))" }} />
-              <Bar dataKey="count" fill="#4ade80" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="count" fill="rgb(var(--primary-rgb, 18, 226, 138))" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </Card>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card className="p-5">
+        <Card className="glow-hover p-5">
           <div className="mb-4 text-sm font-semibold text-foreground">When enquiries actually come in</div>
           <ResponsiveContainer width="100%" height={180}>
             <BarChart data={hourData}>
@@ -233,12 +239,12 @@ export default function ReportsPage() {
               <XAxis dataKey="hour" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
               <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} allowDecimals={false} />
               <Tooltip {...chartTooltip} cursor={{ fill: "hsl(var(--muted))" }} />
-              <Bar dataKey="count" fill="#c084fc" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="count" fill="rgba(var(--color-ai), 0.8)" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </Card>
 
-        <Card className="p-5">
+        <Card className="glow-hover p-5">
           <div className="mb-1 text-sm font-semibold text-foreground">Response time trend</div>
           <div className="mb-3 text-xs text-muted-foreground">average seconds to first response, last 7 days</div>
           <ResponsiveContainer width="100%" height={160}>
@@ -247,7 +253,13 @@ export default function ReportsPage() {
               <XAxis dataKey="day" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} />
               <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
               <Tooltip {...chartTooltip} />
-              <Line type="monotone" dataKey="secs" stroke="#4ade80" strokeWidth={2.5} dot={{ fill: "#4ade80", r: 3 }} />
+              <Line
+                type="monotone"
+                dataKey="secs"
+                stroke="rgb(var(--primary-rgb, 18, 226, 138))"
+                strokeWidth={2.5}
+                dot={{ fill: "rgb(var(--primary-rgb, 18, 226, 138))", r: 3 }}
+              />
             </LineChart>
           </ResponsiveContainer>
         </Card>

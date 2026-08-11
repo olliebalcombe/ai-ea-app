@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { getAvailableSlots } from "@/lib/scheduling";
 import { sendNotificationForEvent } from "@/lib/notifications";
+import { logActivity } from "@/lib/activityLog";
 
 /**
  * GET /api/leads/:id/book?staff_id=...
@@ -45,6 +46,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       price_pence: service?.price_pence ?? null,
       booking_date: date,
       booking_time: time,
+      booking_source: "staff",
     })
     .eq("id", params.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -55,6 +57,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   });
 
   await sendNotificationForEvent({ clientId: lead.client_id, leadId: params.id, event: "booked", extra: `${date} ${time}` });
+  await logActivity({
+    clientId: lead.client_id,
+    leadId: params.id,
+    type: "booked",
+    summary: `Booking confirmed: ${lead.name ?? "a lead"} — ${date} at ${time}${service ? ` (${service.name})` : ""}`,
+  });
 
   return NextResponse.json({ ok: true });
 }

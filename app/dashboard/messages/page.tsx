@@ -1,11 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Phone, MessageSquare, Mail } from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabaseClient";
 import { useCurrentClient } from "@/lib/clientContext";
 import { cn } from "@/lib/utils";
-import type { Lead, LeadMessage } from "@/types";
+import ApprovalQueueCard from "@/components/ApprovalQueueCard";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import type { Lead, LeadMessage, LeadSuggestion } from "@/types";
 
 const CHANNEL_META = {
   call: { icon: Phone, label: "Missed Call" },
@@ -27,28 +30,9 @@ function timeAgo(iso: string) {
   return `${Math.floor(hours / 24)}d`;
 }
 
-export default function MessagesPage() {
-  const { currentClientId } = useCurrentClient();
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [activeId, setActiveId] = useState<string | null>(null);
+function ConversationList({ leads, activeId, onSelect }: { leads: Lead[]; activeId: string | null; onSelect: (id: string) => void }) {
   const [messages, setMessages] = useState<LeadMessage[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!currentClientId) return;
-    setLoading(true);
-    supabaseBrowser
-      .from("leads")
-      .select("*")
-      .eq("client_id", currentClientId)
-      .order("created_at", { ascending: false })
-      .then(({ data }) => {
-        const rows = (data as Lead[]) ?? [];
-        setLeads(rows);
-        setActiveId(rows[0]?.id ?? null);
-        setLoading(false);
-      });
-  }, [currentClientId]);
+  const active = leads.find((l) => l.id === activeId) ?? null;
 
   useEffect(() => {
     if (!activeId) {
@@ -63,21 +47,17 @@ export default function MessagesPage() {
       .then(({ data }) => setMessages((data as LeadMessage[]) ?? []));
   }, [activeId]);
 
-  const active = leads.find((l) => l.id === activeId) ?? null;
-
-  if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>;
-
   return (
-    <div className="flex overflow-hidden rounded-lg border border-border" style={{ height: "calc(100vh - 8rem)" }}>
+    <div className="flex overflow-hidden rounded-lg border border-border" style={{ height: "calc(100vh - 14rem)" }}>
       <div className="w-72 shrink-0 overflow-y-auto border-r border-border p-2">
-        {leads.length === 0 && <p className="p-4 text-sm text-muted-foreground">No conversations yet.</p>}
+        {leads.length === 0 && <p className="p-4 text-sm text-muted-foreground">No conversations here.</p>}
         {leads.map((l) => {
           const Icon = CHANNEL_META[l.channel].icon;
           const isActive = l.id === activeId;
           return (
             <div
               key={l.id}
-              onClick={() => setActiveId(l.id)}
+              onClick={() => onSelect(l.id)}
               className={cn(
                 "mb-1 flex cursor-pointer items-center gap-2.5 rounded-lg p-2.5 hover:bg-accent",
                 isActive && "bg-primary/10"
@@ -124,7 +104,7 @@ export default function MessagesPage() {
                       "max-w-[70%] rounded-lg px-3 py-2 text-sm",
                       m.sender === "lead"
                         ? "ml-auto bg-primary text-primary-foreground"
-                        : m.sender === "ai"
+                        : m.sender === "ai" || m.sender === "staff"
                         ? "bg-muted text-foreground"
                         : "mx-auto bg-amber-500/10 text-center text-xs italic text-amber-300"
                     )}
@@ -136,11 +116,71 @@ export default function MessagesPage() {
             </div>
           </>
         ) : (
-          <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-            Select a conversation
-          </div>
+          <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">Select a conversation</div>
         )}
       </div>
+    </div>
+  );
+}
+
+export default function MessagesPage() {
+  const { currentClientId } = useCurrentClient();
+  const searchParams = useSearchParams();
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [suggestions, setSuggestions] = useState<(LeadSuggestion & { leads: { name: string | null } | null })[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    if (!currentClientId) return;
+    setLoading(true);
+    const [{ data: leadsData }, { data: suggestionsData }] = await Promise.all([
+      supabaseBrowser.from("leads").select("*").eq("client_id", currentClientId).order("created_at", { ascending: false }),
+      supabaseBrowser
+        .from("lead_suggestions")
+        .select("*, leads(name)")
+        .eq("client_id", currentClientId)
+        .eq("status", "pending")
+        .order("created_at", { ascending: false }),
+    ]);
+    const rows = (leadsData as Lead[]) ?? [];
+    setLeads(rows);
+    setActiveId((prev) => prev ?? rows[0]?.id ?? null);
+    setSuggestions((suggestionsData as unknown as (LeadSuggestion & { leads: { name: string | null } | null })[]) ?? []);
+    setLoading(false);
+  }, [currentClientId]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>;
+
+  const needsMe = leads.filter((l) => l.status === "Qualified" || l.ai_paused);
+  const handled = leads.filter((l) => l.status !== "Qualified" && !l.ai_paused);
+
+  return (
+    <div>
+      <h1 className="mb-6 text-2xl font-semibold tracking-tight text-foreground">Inbox</h1>
+      <Tabs defaultValue={searchParams.get("tab") === "approval" ? "approval" : "handled"}>
+        <TabsList className="mb-4">
+          <TabsTrigger value="handled">Handled ({handled.length})</TabsTrigger>
+          <TabsTrigger value="approval">Approval ({suggestions.length})</TabsTrigger>
+          <TabsTrigger value="needsme">Needs Me ({needsMe.length})</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="handled" className="mt-0">
+          <ConversationList leads={handled} activeId={activeId} onSelect={setActiveId} />
+        </TabsContent>
+
+        <TabsContent value="approval" className="mt-0">
+          <ApprovalQueueCard suggestions={suggestions} onChange={load} />
+        </TabsContent>
+
+        <TabsContent value="needsme" className="mt-0">
+          <ConversationList leads={needsMe} activeId={activeId} onSelect={setActiveId} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

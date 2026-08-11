@@ -1,19 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
-import Anthropic from "@anthropic-ai/sdk";
 import { supabaseAdmin } from "@/lib/supabase";
-
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
+import { analyzeLeadPhoto } from "@/lib/visionAnalysis";
 
 /**
  * POST /api/leads/:id/analyze-photo
  * Body: { media_id: string, path: string }
  *
- * Downloads the already-uploaded image from Supabase Storage server-side,
- * sends it to Claude as a real vision request, and writes the summary back
- * to lead_media.ai_summary. Runs with the service role (same pattern as
- * /api/leads/simulate) after verifying the caller is a member of the
- * lead's client.
+ * Staff-side trigger for the real Claude Vision analysis (see
+ * lib/visionAnalysis.ts) -- verifies the caller is a member of the lead's
+ * client before running it. The public portal upload route reuses the same
+ * underlying analysis with a different auth check.
  */
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const leadId = params.id;
@@ -32,7 +29,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "not signed in" }, { status: 401 });
 
-  const { data: lead } = await supabaseAdmin.from("leads").select("id, client_id, category_id").eq("id", leadId).single();
+  const { data: lead } = await supabaseAdmin.from("leads").select("id, client_id").eq("id", leadId).single();
   if (!lead) return NextResponse.json({ error: "lead not found" }, { status: 404 });
 
   const { data: membership } = await supabaseAdmin
@@ -43,41 +40,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     .maybeSingle();
   if (!membership) return NextResponse.json({ error: "not a member of this client" }, { status: 403 });
 
-  const { data: blob, error: downloadError } = await supabaseAdmin.storage.from("lead-media").download(path);
-  if (downloadError || !blob) {
-    return NextResponse.json({ error: downloadError?.message ?? "could not download image" }, { status: 500 });
+  try {
+    const summary = await analyzeLeadPhoto({ mediaId, path });
+    return NextResponse.json({ summary });
+  } catch (e) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : "analysis failed" }, { status: 500 });
   }
-
-  const arrayBuffer = await blob.arrayBuffer();
-  const base64 = Buffer.from(arrayBuffer).toString("base64");
-  const mediaType = blob.type && blob.type.startsWith("image/") ? blob.type : "image/jpeg";
-
-  const response = await anthropic.messages.create({
-    model: "claude-sonnet-4-5",
-    max_tokens: 400,
-    messages: [
-      {
-        role: "user",
-        content: [
-          {
-            type: "image",
-            source: { type: "base64", media_type: mediaType as "image/jpeg" | "image/png" | "image/webp" | "image/gif", data: base64 },
-          },
-          {
-            type: "text",
-            text: "This is a photo a customer sent in about a job enquiry. In 3-4 sentences: describe what's in the photo, note the likely job scope, roughly estimate materials/complexity if relevant, and flag anything that looks urgent (e.g. active leaks, damage, safety issues). Be concise and practical, like a tradesperson glancing at the photo -- no filler.",
-          },
-        ],
-      },
-    ],
-  });
-
-  const summary = response.content
-    .filter((b): b is Anthropic.TextBlock => b.type === "text")
-    .map((b) => b.text)
-    .join("");
-
-  await supabaseAdmin.from("lead_media").update({ ai_summary: summary }).eq("id", mediaId);
-
-  return NextResponse.json({ summary });
 }

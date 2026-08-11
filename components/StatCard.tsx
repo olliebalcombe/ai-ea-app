@@ -11,7 +11,7 @@ export default function StatCard({
   icon?: LucideIcon;
 }) {
   return (
-    <Card>
+    <Card className="glow-hover">
       <CardContent className="flex items-center justify-between p-4">
         <div>
           <p className="text-xs font-medium text-muted-foreground">{label}</p>

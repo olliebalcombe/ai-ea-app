@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { sendSms } from "@/lib/twilio";
 import { runQualificationTurn, ConversationTurn } from "@/lib/anthropic";
-import { buildSystemPrompt, DEFAULT_QUESTIONS } from "@/lib/prompts";
+import { buildSystemPrompt, buildFlooringStructuredTool, DEFAULT_QUESTIONS } from "@/lib/prompts";
 import { sendNotificationForEvent } from "@/lib/notifications";
+import { logActivity } from "@/lib/activityLog";
 
 /**
  * Twilio calls this webhook for every inbound SMS -- both a lead's first
@@ -44,6 +45,22 @@ export async function POST(req: NextRequest) {
 
   await supabaseAdmin.from("lead_messages").insert({ lead_id: lead.id, sender: "lead", body });
 
+  if (isNewLead) {
+    await sendNotificationForEvent({ clientId: client.id, leadId: lead.id, event: "newLead" });
+  }
+
+  if (lead.ai_paused) {
+    // Take Over Conversation is on for this lead -- store the message and
+    // let staff know, but skip the Claude call and AI reply entirely.
+    await logActivity({
+      clientId: client.id,
+      leadId: lead.id,
+      type: "message_sent",
+      summary: `New message from ${lead.name ?? "a lead"} — you've taken over this conversation`,
+    });
+    return new NextResponse("<Response></Response>", { headers: { "Content-Type": "text/xml" } });
+  }
+
   const { data: pastMessages } = await supabaseAdmin
     .from("lead_messages")
     .select("*")
@@ -74,28 +91,44 @@ export async function POST(req: NextRequest) {
     businessNuances: client.business_nuances,
     knowledgeBase,
   });
-  const { reply, extractedAnswers, escalation } = await runQualificationTurn({
+  const { reply, extractedAnswers, escalation, structuredFields } = await runQualificationTurn({
     systemPrompt,
     history,
     questionsRemaining,
+    structuredTool: client.vertical === "Flooring" ? buildFlooringStructuredTool() : undefined,
   });
 
-  if (isNewLead) {
-    await sendNotificationForEvent({ clientId: client.id, leadId: lead.id, event: "newLead" });
-  }
   if (extractedAnswers.length > 0) {
     await supabaseAdmin
       .from("lead_answers")
       .insert(extractedAnswers.map((a) => ({ lead_id: lead.id, question: a.question, answer: a.answer })));
   }
+  if (structuredFields) {
+    await supabaseAdmin.from("leads").update(structuredFields).eq("id", lead.id);
+  }
   if (escalation) {
     // Flag for immediate human attention rather than letting the automated flow continue unchecked.
     await supabaseAdmin.from("leads").update({ status: "Qualified", lost_reason: null }).eq("id", lead.id);
     await sendNotificationForEvent({ clientId: client.id, leadId: lead.id, event: "newLead", extra: `URGENT — ${escalation}`, isUrgent: true });
+    await logActivity({ clientId: client.id, leadId: lead.id, type: "escalated", summary: `Escalated ${lead.name ?? "a lead"} — ${escalation}` });
   }
   const stillRemaining = questionsRemaining.filter((q) => !extractedAnswers.some((a) => a.question === q));
   if (stillRemaining.length === 0 && extractedAnswers.length > 0) {
     await supabaseAdmin.from("leads").update({ status: "Qualified" }).eq("id", lead.id);
+    const summaryParts = [lead.name ?? "A lead"];
+    if (structuredFields?.room_type || structuredFields?.flooring_type) {
+      summaryParts.push(
+        `— ${[structuredFields.room_type, structuredFields.flooring_type].filter(Boolean).join(", ")}`
+      );
+    }
+    if (structuredFields?.install_timeline === "within_30_days") summaryParts.push("· install within 30 days");
+    if (structuredFields?.buying_intent) summaryParts.push(`· ${structuredFields.buying_intent} intent`);
+    await logActivity({
+      clientId: client.id,
+      leadId: lead.id,
+      type: "qualified",
+      summary: `AI qualified ${summaryParts.join(" ")}`,
+    });
   }
 
   await supabaseAdmin.from("lead_messages").insert({ lead_id: lead.id, sender: "ai", body: reply });

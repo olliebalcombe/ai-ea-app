@@ -12,6 +12,7 @@ import {
   Calendar,
   FileBarChart,
   BookOpen,
+  ShieldAlert,
   Palette,
   Store,
   Clapperboard,
@@ -20,6 +21,7 @@ import {
   ListChecks,
   Sparkles,
   Bell,
+  Activity,
 } from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabaseClient";
 import { useCurrentClient } from "@/lib/clientContext";
@@ -49,7 +51,9 @@ const NAV_ITEMS = [
   { href: "/dashboard/bookings", label: "Bookings", icon: ClipboardList },
   { href: "/dashboard/calendar", label: "Calendar", icon: Calendar },
   { href: "/dashboard/reports", label: "Reports", icon: FileBarChart },
+  { href: "/dashboard/activity", label: "Assistant Activity", icon: Activity },
   { href: "/dashboard/knowledge-base", label: "Knowledge Base", icon: BookOpen },
+  { href: "/dashboard/business-rules", label: "Business Rules", icon: ShieldAlert },
   { href: "/dashboard/design-studio", label: "Design Studio", icon: Palette },
   { href: "/dashboard/marketplace", label: "Marketplace", icon: Store },
   { href: "/dashboard/canvas", label: "Canvas", icon: Clapperboard },
