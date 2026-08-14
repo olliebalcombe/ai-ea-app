@@ -47,7 +47,8 @@ export default function LeadDetailContent({
   leadId: string;
   compact?: boolean;
 }) {
-  const { currentClientId } = useCurrentClient();
+  const { currentClientId, currentClient } = useCurrentClient();
+  const assistantName = currentClient?.assistant_name ?? "your assistant";
 
   const [lead, setLead] = useState<LeadRow | null>(null);
   const [messages, setMessages] = useState<LeadMessage[]>([]);
@@ -442,7 +443,7 @@ export default function LeadDetailContent({
                           <div className={m.sender === "system" ? "" : "max-w-[75%]"}>
                             {(m.sender === "ai" || m.sender === "staff") && (
                               <div className="mb-0.5 text-right text-[10px] font-medium text-muted-foreground">
-                                {m.sender === "ai" ? "AI Assistant" : "You"}
+                                {m.sender === "ai" ? assistantName : "You"}
                               </div>
                             )}
                             <div
@@ -644,7 +645,7 @@ export default function LeadDetailContent({
                     {lead.ai_paused ? "You've taken over" : "AI is handling this conversation"}
                   </div>
                   <div className="text-[11px] text-muted-foreground">
-                    {lead.ai_paused ? "Inbound replies wait for you — the AI won't respond" : "Toggle to take over and reply yourself"}
+                    {lead.ai_paused ? `Inbound replies wait for you — ${assistantName} won't respond` : "Toggle to take over and reply yourself"}
                   </div>
                 </div>
               </div>

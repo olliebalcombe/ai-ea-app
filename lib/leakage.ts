@@ -94,21 +94,22 @@ export async function evaluateLeakage(clientId: string): Promise<void> {
     }
   }
 
+  // A direct insert relying on the partial unique index on (lead_id, type)
+  // WHERE status='pending' (see supabase/fix_duplicate_suggestions.sql) --
+  // not a check-then-insert, which raced under concurrent evaluations (React
+  // 18 dev-mode double-invoking effects, repeated page loads, etc.) and let
+  // duplicate pending suggestions slip through. A 23505 conflict here just
+  // means the suggestion already exists, which is the expected, correct
+  // outcome, not an error.
   for (const r of results) {
-    const { data: existing } = await supabaseAdmin
-      .from("lead_suggestions")
-      .select("id")
-      .eq("lead_id", r.leadId)
-      .eq("type", r.type)
-      .eq("status", "pending")
-      .maybeSingle();
-    if (!existing) {
-      await supabaseAdmin.from("lead_suggestions").insert({
-        client_id: clientId,
-        lead_id: r.leadId,
-        type: r.type,
-        reason: r.reason,
-      });
+    const { error } = await supabaseAdmin.from("lead_suggestions").insert({
+      client_id: clientId,
+      lead_id: r.leadId,
+      type: r.type,
+      reason: r.reason,
+    });
+    if (error && error.code !== "23505") {
+      console.error("failed to insert leakage suggestion", error);
     }
   }
 }

@@ -4,24 +4,28 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Search,
-  LayoutDashboard,
+  Home,
   Inbox,
+  ClipboardCheck,
+  Clock,
   Kanban,
   XCircle,
   ClipboardList,
   Calendar,
   FileBarChart,
   BookOpen,
-  ShieldAlert,
+  Workflow,
   Palette,
   Store,
   Clapperboard,
   Users,
+  UserCog,
   Wrench,
   ListChecks,
   Sparkles,
   Bell,
   Activity,
+  Settings as SettingsIcon,
 } from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabaseClient";
 import { useCurrentClient } from "@/lib/clientContext";
@@ -44,24 +48,28 @@ const MENTION_LABELS: Record<string, string> = {
 };
 
 const NAV_ITEMS = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/dashboard/messages", label: "Messages", icon: Inbox },
+  { href: "/dashboard", label: "Today", icon: Home },
+  { href: "/dashboard/inbox", label: "Inbox", icon: Inbox },
+  { href: "/dashboard/approvals", label: "Approvals", icon: ClipboardCheck },
   { href: "/dashboard/leads", label: "Lead Queue", icon: Kanban },
   { href: "/dashboard/lost", label: "Lost Leads", icon: XCircle },
+  { href: "/dashboard/follow-ups", label: "Follow-ups", icon: Clock },
+  { href: "/dashboard/calendar", label: "Calendar & Site Visits", icon: Calendar },
   { href: "/dashboard/bookings", label: "Bookings", icon: ClipboardList },
-  { href: "/dashboard/calendar", label: "Calendar", icon: Calendar },
   { href: "/dashboard/reports", label: "Reports", icon: FileBarChart },
+  { href: "/dashboard/business-memory", label: "Business Memory", icon: BookOpen },
+  { href: "/dashboard/playbooks", label: "Playbooks", icon: Workflow },
+  { href: "/dashboard/customers", label: "Customers", icon: Users },
   { href: "/dashboard/activity", label: "Assistant Activity", icon: Activity },
-  { href: "/dashboard/knowledge-base", label: "Knowledge Base", icon: BookOpen },
-  { href: "/dashboard/business-rules", label: "Business Rules", icon: ShieldAlert },
   { href: "/dashboard/design-studio", label: "Design Studio", icon: Palette },
   { href: "/dashboard/marketplace", label: "Marketplace", icon: Store },
   { href: "/dashboard/canvas", label: "Canvas", icon: Clapperboard },
-  { href: "/dashboard/settings/staff", label: "Settings: Staff", icon: Users },
+  { href: "/dashboard/settings/staff", label: "Settings: Staff", icon: UserCog },
   { href: "/dashboard/settings/services", label: "Settings: Services", icon: Wrench },
   { href: "/dashboard/settings/questions", label: "Settings: Questions", icon: ListChecks },
   { href: "/dashboard/settings/ai", label: "Settings: AI", icon: Sparkles },
   { href: "/dashboard/settings/notifications", label: "Settings: Notifications", icon: Bell },
+  { href: "/dashboard/settings/integrations", label: "Settings: Integrations", icon: SettingsIcon },
 ];
 
 export default function CommandPalette() {
@@ -136,7 +144,7 @@ export default function CommandPalette() {
 
       <CommandDialog open={open} onOpenChange={setOpen}>
         <CommandInput
-          placeholder="Search leads, jump to a page, or type @lead / @kb / @booking / @component…"
+          placeholder="Search leads, pages, or @commands…"
           value={query}
           onValueChange={setQuery}
         />
@@ -155,7 +163,7 @@ export default function CommandPalette() {
                   onSelect={() =>
                     go(
                       r.href ??
-                        (r.type === "kb" ? "/dashboard/knowledge-base" : "/dashboard/bookings")
+                        (r.type === "kb" ? "/dashboard/business-memory" : "/dashboard/bookings")
                     )
                   }
                 >
@@ -167,7 +175,7 @@ export default function CommandPalette() {
           ) : (
             <>
               {leadResults.length > 0 && (
-                <CommandGroup heading="Leads">
+                <CommandGroup heading="RECENT LEADS">
                   {leadResults.map((lead) => (
                     <CommandItem key={lead.id} onSelect={() => go(`/dashboard/leads/${lead.id}`)}>
                       {lead.name ?? "Unknown"}
@@ -179,7 +187,7 @@ export default function CommandPalette() {
                 </CommandGroup>
               )}
 
-              <CommandGroup heading="Navigate">
+              <CommandGroup heading="PAGES">
                 {NAV_ITEMS.map((item) => {
                   const Icon = item.icon;
                   return (
@@ -193,6 +201,18 @@ export default function CommandPalette() {
             </>
           )}
         </CommandList>
+
+        <div className="flex items-center gap-3 border-t border-white/10 px-3 py-2 text-[10px] text-muted-foreground">
+          <span className="flex items-center gap-1">
+            <kbd className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5">↵</kbd> Select
+          </span>
+          <span className="flex items-center gap-1">
+            <kbd className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5">ESC</kbd> Close
+          </span>
+          <span className="ml-auto flex items-center gap-1">
+            <kbd className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5">⌘K</kbd> Toggle
+          </span>
+        </div>
       </CommandDialog>
     </>
   );

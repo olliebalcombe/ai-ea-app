@@ -46,7 +46,7 @@ export async function sendNotificationForEvent(opts: {
 
   const sentTo: string[] = [];
   if (prefs.sms_enabled && client.contact_phone) { await sendSms(client.contact_phone, message); sentTo.push("sms"); }
-  if (prefs.email_enabled && client.contact_email) { await sendEmail(client.contact_email, `AI EA — ${event}`, message, client.assistant_name); sentTo.push("email"); }
+  if (prefs.email_enabled && client.contact_email) { await sendEmail(client.contact_email, `${client.assistant_name} — ${event}`, message, client.assistant_name); sentTo.push("email"); }
   if (prefs.whatsapp_enabled) { /* TODO: WhatsApp Business API integration — not yet wired, see product roadmap Horizon 2 */ }
   if (prefs.push_enabled) { /* TODO: push requires a registered device token per client — not yet wired */ }
 

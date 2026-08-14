@@ -1,4 +1,6 @@
 import { supabaseAdmin } from "./supabase";
+import { getGoogleFreeBusy } from "./calendar/google";
+import { getOutlookFreeBusy } from "./calendar/outlook";
 
 export interface Slot {
   date: string;   // YYYY-MM-DD
@@ -18,12 +20,51 @@ function toTimeStr(mins: number) {
 }
 
 /**
+ * If the client has a connected Google/Outlook calendar, fetches real busy
+ * windows for the given range -- inert (returns []) until real OAuth
+ * credentials exist and a connection has actually been made; never throws,
+ * since a calendar hiccup shouldn't take down slot-fetching entirely.
+ */
+async function getExternalBusyWindows(clientId: string, timeMin: string, timeMax: string): Promise<{ start: string; end: string }[]> {
+  const { data: connection } = await supabaseAdmin
+    .from("calendar_connections")
+    .select("*")
+    .eq("client_id", clientId)
+    .maybeSingle();
+  if (!connection) return [];
+
+  try {
+    if (connection.provider === "google") {
+      return await getGoogleFreeBusy({
+        accessToken: connection.access_token,
+        refreshToken: connection.refresh_token,
+        timeMin,
+        timeMax,
+      });
+    }
+    if (connection.provider === "outlook" && connection.connected_email) {
+      return await getOutlookFreeBusy({
+        accessToken: connection.access_token,
+        refreshToken: connection.refresh_token,
+        email: connection.connected_email,
+        timeMin,
+        timeMax,
+      });
+    }
+  } catch (e) {
+    console.error("calendar free/busy lookup failed", e);
+  }
+  return [];
+}
+
+/**
  * Returns the next available slots for a given client/staff member over the
  * next `daysAhead` days, respecting:
  *  - the client's business hours
  *  - the client's buffer_minutes between bookings
  *  - any soft-constraint scheduling_rules (e.g. "no bookings Tuesday mornings")
  *  - existing bookings already on that staff member's day
+ *  - a connected external calendar's real busy windows, if one exists
  */
 export async function getAvailableSlots(opts: {
   clientId: string;
@@ -40,6 +81,9 @@ export async function getAvailableSlots(opts: {
 
   const results: Slot[] = [];
   const today = new Date();
+  const rangeEnd = new Date(today);
+  rangeEnd.setDate(rangeEnd.getDate() + daysAhead);
+  const externalBusy = await getExternalBusyWindows(clientId, today.toISOString(), rangeEnd.toISOString());
 
   for (let d = 0; d < daysAhead && results.length < maxSlots; d++) {
     const day = new Date(today);
@@ -74,9 +118,19 @@ export async function getAvailableSlots(opts: {
         return cursor < bm + client.buffer_minutes && slotEnd > bm - client.buffer_minutes;
       });
 
+      const slotStartDate = new Date(`${dateStr}T00:00:00`);
+      slotStartDate.setMinutes(cursor);
+      const slotEndDate = new Date(`${dateStr}T00:00:00`);
+      slotEndDate.setMinutes(slotEnd);
+      const blockedByExternalCalendar = externalBusy.some((w) => {
+        const ws = new Date(w.start).getTime();
+        const we = new Date(w.end).getTime();
+        return slotStartDate.getTime() < we && slotEndDate.getTime() > ws;
+      });
+
       const isPast = d === 0 && cursor <= today.getHours() * 60 + today.getMinutes();
 
-      if (!blockedByRule && !blockedByBooking && !isPast) {
+      if (!blockedByRule && !blockedByBooking && !blockedByExternalCalendar && !isPast) {
         results.push({ date: dateStr, time: toTimeStr(cursor) });
       }
       cursor += SLOT_LENGTH_MIN;

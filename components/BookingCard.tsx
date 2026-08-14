@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Sparkles, User, ClipboardList, FlaskConical, Eye, CalendarClock } from "lucide-react";
+import { Sparkles, User, ClipboardList, FlaskConical, Eye, CalendarClock, MapPin } from "lucide-react";
 import { hoverLift } from "@/lib/motion";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ export interface BookingCardData {
   staffName: string | null;
   date: string | null;
   time: string | null;
+  postcode: string | null;
   kind: "lead" | "manual";
   bookingSource: "staff" | "customer_portal" | "simulated" | null;
 }
@@ -86,6 +87,11 @@ export default function BookingCard({
             {data.staffName && (
               <span className="rounded-full border border-border px-2 py-0.5 text-[10px] text-muted-foreground">
                 {data.staffName}
+              </span>
+            )}
+            {data.postcode && (
+              <span className="flex items-center gap-0.5 rounded-full border border-border px-2 py-0.5 text-[10px] text-muted-foreground">
+                <MapPin className="h-2.5 w-2.5" /> {data.postcode}
               </span>
             )}
             <span

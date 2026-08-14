@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { sendEmail } from "@/lib/email";
 import { runQualificationTurn, ConversationTurn } from "@/lib/anthropic";
-import { buildSystemPrompt, buildFlooringStructuredTool, DEFAULT_QUESTIONS } from "@/lib/prompts";
+import { buildSystemPrompt, buildFlooringStructuredTool } from "@/lib/prompts";
+import { loadQuestionConfig } from "@/lib/qualifyingQuestions";
 import { logActivity } from "@/lib/activityLog";
 
 /**
@@ -65,8 +66,11 @@ export async function POST(req: NextRequest) {
 
   const { data: answeredRows } = await supabaseAdmin.from("lead_answers").select("question").eq("lead_id", lead.id);
   const answeredQuestions = new Set((answeredRows || []).map((r) => r.question));
-  const allQuestions = DEFAULT_QUESTIONS[client.vertical] || [];
+  const questionConfig = await loadQuestionConfig(client.id, client.vertical);
+  const allQuestions = questionConfig.map((q) => q.question);
+  const mandatoryQuestions = questionConfig.filter((q) => q.mandatory).map((q) => q.question);
   const questionsRemaining = allQuestions.filter((q) => !answeredQuestions.has(q));
+  const mandatoryRemaining = mandatoryQuestions.filter((q) => !answeredQuestions.has(q));
 
   const { data: knowledgeBase } = await supabaseAdmin
     .from("knowledge_base_entries")
@@ -81,6 +85,7 @@ export async function POST(req: NextRequest) {
     toneStyle: client.tone_style,
     businessNuances: client.business_nuances,
     knowledgeBase,
+    questionGuidance: questionConfig.filter((q) => questionsRemaining.includes(q.question)),
   });
 
   const { reply, extractedAnswers, escalation, structuredFields } = await runQualificationTurn({
@@ -102,7 +107,7 @@ export async function POST(req: NextRequest) {
     await supabaseAdmin.from("leads").update({ status: "Qualified" }).eq("id", lead.id);
     await logActivity({ clientId: client.id, leadId: lead.id, type: "escalated", summary: `Escalated ${lead.name ?? "a lead"} — ${escalation}` });
   }
-  const stillRemaining = questionsRemaining.filter((q) => !extractedAnswers.some((a) => a.question === q));
+  const stillRemaining = mandatoryRemaining.filter((q) => !extractedAnswers.some((a) => a.question === q));
   if (stillRemaining.length === 0 && extractedAnswers.length > 0) {
     await supabaseAdmin.from("leads").update({ status: "Qualified" }).eq("id", lead.id);
     await logActivity({ clientId: client.id, leadId: lead.id, type: "qualified", summary: `AI qualified ${lead.name ?? "a lead"}` });

@@ -2,10 +2,30 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { supabaseAdmin } from "@/lib/supabase";
 import { runQualificationTurn, type ConversationTurn, type ExtractedAnswer } from "@/lib/anthropic";
-import { buildSystemPrompt, DEFAULT_QUESTIONS } from "@/lib/prompts";
+import { buildSystemPrompt, buildVoiceOpener } from "@/lib/prompts";
+import { loadQuestionConfig } from "@/lib/qualifyingQuestions";
+import { logActivity } from "@/lib/activityLog";
+import type { ActivityType } from "@/types";
 
-type Mode = "book" | "escalate" | "price_objection" | "reschedule" | "custom";
-const MODES: Mode[] = ["book", "escalate", "price_objection", "reschedule", "custom"];
+type Mode =
+  | "quick_booking"
+  | "multi_room"
+  | "escalate"
+  | "price_objection"
+  | "reschedule"
+  | "missed_call_mobile"
+  | "missed_call_landline"
+  | "custom";
+const MODES: Mode[] = [
+  "quick_booking",
+  "multi_room",
+  "escalate",
+  "price_objection",
+  "reschedule",
+  "missed_call_mobile",
+  "missed_call_landline",
+  "custom",
+];
 
 interface ThoughtStep {
   customerMessage: string;
@@ -25,6 +45,7 @@ interface DraftPayload {
   answers: { question: string; answer: string }[];
   booking: Record<string, unknown> | null;
   bookingUpdate?: { id: string; booking_date: string; booking_time: string; note: string };
+  activity?: { type: ActivityType; summary: string };
 }
 
 /**
@@ -37,10 +58,12 @@ interface DraftPayload {
  * is written; the would-be rows are returned as `draft` for the client to
  * either discard or POST to /api/leads/simulate/commit to actually merge in.
  *
- * "book"/"escalate"/"price_objection"/"custom" drive the real
- * runQualificationTurn pipeline -- the AI replies, extracted entities, and
- * confidence scores are genuine Claude output against that client's real
- * system prompt (tone, nuances, knowledge base), not authored text.
+ * "quick_booking"/"multi_room"/"escalate"/"price_objection"/"custom" drive
+ * the real runQualificationTurn pipeline -- the AI replies, extracted
+ * entities, and confidence scores are genuine Claude output against that
+ * client's real system prompt (tone, nuances, knowledge base), not authored
+ * text. "missed_call_mobile"/"missed_call_landline" mirror the real outcome
+ * of the missed-call webhook without placing an actual Twilio call/lookup.
  * "reschedule" isn't an entity-extraction scenario, so it keeps a more
  * direct approach (see below).
  */
@@ -93,13 +116,15 @@ export async function POST(req: NextRequest) {
   const phone = `+4477${Math.floor(10000000 + Math.random() * 89999999)}`;
   const respSeconds = () => Math.floor(8 + Math.random() * 40);
 
-  if (mode === "book" || mode === "escalate" || mode === "price_objection" || mode === "custom") {
-    if ((mode === "book" || mode === "price_objection") && (!service || !staff)) {
+  if (mode === "quick_booking" || mode === "multi_room" || mode === "escalate" || mode === "price_objection" || mode === "custom") {
+    if ((mode === "quick_booking" || mode === "multi_room" || mode === "price_objection") && (!service || !staff)) {
       return NextResponse.json(
         { error: "This business needs at least one service and one staff member configured to simulate a booking." },
         { status: 400 }
       );
     }
+
+    const questionConfig = await loadQuestionConfig(client.id, client.vertical);
 
     const systemPrompt = buildSystemPrompt({
       vertical: client.vertical,
@@ -109,13 +134,19 @@ export async function POST(req: NextRequest) {
       toneStyle: client.tone_style,
       businessNuances: client.business_nuances,
       knowledgeBase,
+      questionGuidance: questionConfig,
     });
 
-    const scriptedCustomerTurns: Record<"book" | "escalate" | "price_objection", string[]> = {
-      book: [
-        `Hi, I need help with ${service!.name.toLowerCase()}.`,
-        "I'm based nearby and would need this sorted fairly soon, ideally this week.",
-        "Budget's flexible, just want it done properly — whatever slot works best for you.",
+    const scriptedCustomerTurns: Record<"quick_booking" | "multi_room" | "escalate" | "price_objection", string[]> = {
+      quick_booking: [
+        `Hi, I need a quote for ${service!.name.toLowerCase()} and would like to get a site visit booked in as soon as possible.`,
+      ],
+      multi_room: [
+        `Hi, we're renovating a few rooms and need some flooring advice and a quote.`,
+        "We can't decide between LVT and carpet for the living areas — what would you actually recommend, and what's the rough per-square-metre rate for each?",
+        "Roughly how many square metres would you say is typical for a 3-bed house, just so I can get a ballpark figure?",
+        "Would it be possible to get a couple of samples sent out before we commit to anything?",
+        "That all sounds good — let's get a site visit booked in so you can measure properly.",
       ],
       price_objection: [
         `Hi, roughly how much would ${service!.name.toLowerCase()} cost?`,
@@ -123,14 +154,14 @@ export async function POST(req: NextRequest) {
         "Okay, let's go ahead then — I'm flexible on timing, whatever you've got.",
       ],
       escalate: [
-        "Hi, I've got a bit of an unusual one and wasn't sure who to ask.",
-        "It's not really a standard job, more of a one-off request that doesn't fit your usual categories — might need someone to call me directly.",
+        "I am NOT happy. The job you did last week has already come apart and I want my money back.",
+        "This isn't good enough — I want to speak to whoever's in charge, not a chatbot. Get someone to call me back today.",
       ],
     };
 
     const customerTurns = mode === "custom" ? [customPrompt!.trim()] : scriptedCustomerTurns[mode];
 
-    let allQuestions = DEFAULT_QUESTIONS[client.vertical] || [];
+    let allQuestions = questionConfig.map((q) => q.question);
     const history: ConversationTurn[] = [];
     const thoughtStream: ThoughtStep[] = [];
     const allAnswers = new Map<string, ExtractedAnswer>();
@@ -202,13 +233,59 @@ export async function POST(req: NextRequest) {
             staff_id: staff!.id,
             booking_date: bookingDate,
             booking_time: "10:00",
-            note: mode === "book" ? "Simulated booking — auto-qualified" : "Simulated booking — after price discussion",
+            note: mode === "price_objection" ? "Simulated booking — after price discussion" : "Simulated booking — auto-qualified",
           }
         : null,
     };
     if (isEscalate) {
       draft.messages.push({ sender: "system", body: "Escalated to the team for manual follow-up." });
     }
+
+    if (sandbox) {
+      return NextResponse.json({ draft, thoughtStream, mode });
+    }
+
+    const leadId = await commitDraft(draft);
+    return NextResponse.json({ lead_id: leadId, thoughtStream });
+  }
+
+  if (mode === "missed_call_mobile" || mode === "missed_call_landline") {
+    // Mirrors the real outcome of app/api/webhooks/twilio/voice-status/route.ts --
+    // same real message text and same real buildVoiceOpener() greeting -- without
+    // placing an actual Twilio Lookup or outbound call against a fake test number.
+    const isLandline = mode === "missed_call_landline";
+    const messages: DraftMessage[] = [{ sender: "system", body: "Missed call — no answer." }];
+
+    if (isLandline) {
+      const greeting = buildVoiceOpener({ assistantName: client.assistant_name, toneStyle: client.tone_style });
+      messages.push({ sender: "system", body: "Outbound AI voice callback placed after a missed call." });
+      messages.push({ sender: "ai", body: greeting });
+    } else {
+      const text = `Hi! Sorry we missed your call at ${client.name}. How can we help with your enquiry today?`;
+      messages.push({ sender: "ai", body: text });
+    }
+
+    const draft: DraftPayload = {
+      lead: {
+        client_id: clientId,
+        name,
+        phone,
+        channel: "call",
+        status: "New",
+        response_seconds: respSeconds(),
+      },
+      messages,
+      answers: [],
+      booking: null,
+      activity: {
+        type: "missed_call_recovery",
+        summary: isLandline
+          ? "Missed call from a landline; placed an outbound AI voice callback"
+          : "Missed call from mobile; sent an instant text",
+      },
+    };
+
+    const thoughtStream: ThoughtStep[] = [];
 
     if (sandbox) {
       return NextResponse.json({ draft, thoughtStream, mode });
@@ -375,6 +452,9 @@ export async function commitDraft(draft: DraftPayload): Promise<string> {
   if (draft.bookingUpdate) {
     const { id, ...update } = draft.bookingUpdate;
     await supabaseAdmin.from("manual_bookings").update(update).eq("id", id);
+  }
+  if (draft.activity) {
+    await logActivity({ clientId: draft.lead.client_id as string, leadId: lead.id, ...draft.activity });
   }
 
   return lead.id;

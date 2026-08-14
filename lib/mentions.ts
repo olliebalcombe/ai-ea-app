@@ -15,19 +15,23 @@ export interface MentionResult {
 }
 
 const COMPONENT_PAGES = [
-  { id: "dashboard", label: "Dashboard", href: "/dashboard" },
-  { id: "messages", label: "Messages", href: "/dashboard/messages" },
+  { id: "today", label: "Today", href: "/dashboard" },
+  { id: "inbox", label: "Inbox", href: "/dashboard/inbox" },
+  { id: "approvals", label: "Approvals", href: "/dashboard/approvals" },
   { id: "leads", label: "Lead Queue", href: "/dashboard/leads" },
   { id: "lost", label: "Lost Leads", href: "/dashboard/lost" },
+  { id: "follow-ups", label: "Follow-ups", href: "/dashboard/follow-ups" },
   { id: "bookings", label: "Bookings", href: "/dashboard/bookings" },
   { id: "calendar", label: "Calendar", href: "/dashboard/calendar" },
   { id: "reports", label: "Reports", href: "/dashboard/reports" },
+  { id: "business-memory", label: "Business Memory", href: "/dashboard/business-memory" },
+  { id: "playbooks", label: "Playbooks", href: "/dashboard/playbooks" },
+  { id: "customers", label: "Customers", href: "/dashboard/customers" },
   { id: "activity", label: "Assistant Activity", href: "/dashboard/activity" },
-  { id: "knowledge-base", label: "Knowledge Base", href: "/dashboard/knowledge-base" },
-  { id: "business-rules", label: "Business Rules", href: "/dashboard/business-rules" },
   { id: "design-studio", label: "Design Studio", href: "/dashboard/design-studio" },
   { id: "marketplace", label: "Marketplace", href: "/dashboard/marketplace" },
   { id: "canvas", label: "Canvas", href: "/dashboard/canvas" },
+  { id: "integrations", label: "Integrations", href: "/dashboard/settings/integrations" },
 ];
 
 /** Parses a raw "@..." fragment (no leading @) into a mention type + remaining search text. */

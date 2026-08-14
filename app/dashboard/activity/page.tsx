@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Sparkles, AlertTriangle, CalendarCheck, MessageSquare, Bell, Star, Globe, type LucideIcon } from "lucide-react";
+import { Sparkles, AlertTriangle, CalendarCheck, MessageSquare, Bell, Star, Globe, PhoneCall, type LucideIcon } from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabaseClient";
 import { useCurrentClient } from "@/lib/clientContext";
 import { staggerContainer, staggerItem, hoverLift } from "@/lib/motion";
@@ -21,6 +21,7 @@ const ICON_FOR: Record<ActivityType, LucideIcon> = {
   reminder_sent: Bell,
   review_requested: Star,
   portal_action: Globe,
+  missed_call_recovery: PhoneCall,
 };
 
 const COLOR_VAR_FOR: Record<ActivityType, string> = {
@@ -31,10 +32,12 @@ const COLOR_VAR_FOR: Record<ActivityType, string> = {
   reminder_sent: "--color-info",
   review_requested: "--color-attention",
   portal_action: "--color-info",
+  missed_call_recovery: "--color-ai",
 };
 
 export default function AssistantActivityPage() {
-  const { currentClientId } = useCurrentClient();
+  const { currentClientId, currentClient } = useCurrentClient();
+  const assistantName = currentClient?.assistant_name ?? "your assistant";
   const router = useRouter();
   const [items, setItems] = useState<(ActivityLogEntry & { leads: { name: string | null } | null })[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,7 +71,7 @@ export default function AssistantActivityPage() {
     <div>
       <h1 className="mb-2 text-2xl font-semibold tracking-tight text-foreground">Assistant Activity</h1>
       <p className="mb-6 text-sm text-muted-foreground">
-        A chronological, real audit log of everything the AI assistant has done for this business.
+        A chronological, real audit log of everything {assistantName} has done for this business.
       </p>
 
       {items.length === 0 && !loading ? (

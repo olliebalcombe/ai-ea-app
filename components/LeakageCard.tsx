@@ -21,7 +21,7 @@ export default function LeakageCard({ suggestions }: { suggestions: (LeadSuggest
     >
       <div className="mb-3 flex items-center gap-2">
         <AlertTriangle className="h-4 w-4" style={{ color: "rgb(var(--color-risk))" }} />
-        <div className="text-sm font-semibold text-foreground">Opportunities at risk</div>
+        <div className="text-sm font-semibold text-foreground">At risk</div>
       </div>
       <div className="mb-3 space-y-1.5">
         {Array.from(byType.entries()).map(([type, count]) => {
@@ -36,7 +36,7 @@ export default function LeakageCard({ suggestions }: { suggestions: (LeadSuggest
         })}
       </div>
       <Button asChild size="sm" variant="outline">
-        <Link href="/dashboard/messages?tab=approval">
+        <Link href="/dashboard/approvals">
           Review Approval Queue <ArrowRight className="h-3.5 w-3.5" />
         </Link>
       </Button>

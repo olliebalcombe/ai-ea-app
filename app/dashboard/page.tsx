@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Sparkles,
   CalendarCheck,
@@ -9,27 +9,30 @@ import {
   Palette,
   Wifi,
   ArrowRight,
-  Bot,
   ClipboardCheck,
-  Clock3,
   PoundSterling,
-  Info,
   MessageSquare,
   Bell,
   Star,
   Globe,
+  PhoneCall,
+  Zap,
+  Radio,
   type LucideIcon,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { supabaseBrowser } from "@/lib/supabaseClient";
 import { useCurrentClient } from "@/lib/clientContext";
 import { staggerContainer, staggerItem } from "@/lib/motion";
-import StatCard from "@/components/StatCard";
+import ApprovalQueueCard from "@/components/ApprovalQueueCard";
 import LeakageCard from "@/components/LeakageCard";
 import InteractiveChart from "@/components/InteractiveChart";
+import TodaySchedule, { type ScheduleItem } from "@/components/TodaySchedule";
+import SimulateLeadDrawer from "@/components/SimulateLeadDrawer";
+import BroadcastDialog from "@/components/BroadcastDialog";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import type { Lead, Staff, ActivityLogEntry, ActivityType, LeadSuggestion } from "@/types";
+import type { Lead, ActivityLogEntry, ActivityType, LeadSuggestion } from "@/types";
 
 const STATUS_FLOW = ["New", "Contacted", "Qualified", "Booked", "Won"] as const;
 const STATUS_COLOR_VAR: Record<string, string> = {
@@ -48,13 +51,10 @@ const ACTIVITY_ICON: Record<ActivityType, LucideIcon> = {
   reminder_sent: Bell,
   review_requested: Star,
   portal_action: Globe,
+  missed_call_recovery: PhoneCall,
 };
 
 const ASSUMED_MINUTES_PER_CONVERSATION = 8;
-
-function formatPrice(pence: number) {
-  return `£${(pence / 100).toFixed(2)}`;
-}
 
 function fmtGBP(pence: number) {
   return `£${Math.round(pence / 100).toLocaleString("en-GB")}`;
@@ -94,25 +94,31 @@ function darken(hex: string, amount: number) {
   return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, "0")}`;
 }
 
+/** Mission Control: a single-screen 60/40 command center. Every number here already had a real query behind it before this round -- this is a layout reorganization, not a new data source. */
 export default function DashboardOverviewPage() {
+  const router = useRouter();
   const { currentClient, currentClientId, userEmail } = useCurrentClient();
   const [leads, setLeads] = useState<Lead[]>([]);
-  const [staffCount, setStaffCount] = useState(0);
   const [activity, setActivity] = useState<ActivityLogEntry[]>([]);
   const [suggestions, setSuggestions] = useState<(LeadSuggestion & { leads: { name: string | null } | null })[]>([]);
   const [handledLeadIds, setHandledLeadIds] = useState<Set<string>>(new Set());
+  const [scheduleItems, setScheduleItems] = useState<ScheduleItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [whiteLabel, setWhiteLabel] = useState(false);
+  const [simulateOpen, setSimulateOpen] = useState(false);
+  const [broadcastOpen, setBroadcastOpen] = useState(false);
+  const [testCalling, setTestCalling] = useState(false);
+  const [testCallResult, setTestCallResult] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!currentClientId) return;
     setLoading(true);
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
     const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const todayStr = new Date().toISOString().slice(0, 10);
 
-    const [leadsRes, staffRes, activityRes, suggestionsRes, aiMsgsRes] = await Promise.all([
+    const [leadsRes, activityRes, suggestionsRes, aiMsgsRes, todayLeadsRes, todayManualRes] = await Promise.all([
       supabaseBrowser.from("leads").select("*").eq("client_id", currentClientId).order("created_at", { ascending: false }),
-      supabaseBrowser.from("staff").select("id").eq("client_id", currentClientId),
       supabaseBrowser
         .from("activity_log")
         .select("*")
@@ -132,13 +138,50 @@ export default function DashboardOverviewPage() {
         .eq("leads.client_id", currentClientId)
         .eq("sender", "ai")
         .gte("created_at", since24h),
+      supabaseBrowser
+        .from("leads")
+        .select("id, name, phone, postcode, booking_date, booking_time, services:service_id(name)")
+        .eq("client_id", currentClientId)
+        .eq("booking_date", todayStr)
+        .in("status", ["Booked", "Won"]),
+      supabaseBrowser
+        .from("manual_bookings")
+        .select("id, customer_name, booking_date, booking_time, services:service_id(name)")
+        .eq("client_id", currentClientId)
+        .eq("booking_date", todayStr),
     ]);
 
     setLeads((leadsRes.data as Lead[]) ?? []);
-    setStaffCount(staffRes.data?.length ?? 0);
     setActivity((activityRes.data as ActivityLogEntry[]) ?? []);
     setSuggestions((suggestionsRes.data as unknown as (LeadSuggestion & { leads: { name: string | null } | null })[]) ?? []);
     setHandledLeadIds(new Set(((aiMsgsRes.data as { lead_id: string }[]) ?? []).map((m) => m.lead_id)));
+
+    const todayLeads = (todayLeadsRes.data as unknown as
+      | { id: string; name: string | null; phone: string | null; postcode: string | null; booking_date: string; booking_time: string; services: { name: string } | null }[]
+      | null) ?? [];
+    const todayManual = (todayManualRes.data as unknown as
+      | { id: string; customer_name: string; booking_date: string; booking_time: string; services: { name: string } | null }[]
+      | null) ?? [];
+    setScheduleItems([
+      ...todayLeads.map((l) => ({
+        id: l.id,
+        customer: l.name ?? "Unknown",
+        service: l.services?.name ?? null,
+        time: l.booking_time,
+        date: l.booking_date,
+        phone: l.phone,
+        postcode: l.postcode,
+      })),
+      ...todayManual.map((m) => ({
+        id: m.id,
+        customer: m.customer_name,
+        service: m.services?.name ?? null,
+        time: m.booking_time,
+        date: m.booking_date,
+        phone: null,
+        postcode: null,
+      })),
+    ]);
     setLoading(false);
   }, [currentClientId]);
 
@@ -152,6 +195,26 @@ export default function DashboardOverviewPage() {
       .catch(() => {})
       .finally(() => load());
   }, [currentClientId, load]);
+
+  async function testVoiceCall() {
+    if (!currentClientId) return;
+    setTestCalling(true);
+    setTestCallResult(null);
+    try {
+      const res = await fetch("/api/voice/test-call", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ client_id: currentClientId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Call failed");
+      setTestCallResult(`Calling ${data.calledNumber} now…`);
+    } catch (e) {
+      setTestCallResult(e instanceof Error ? e.message : "Call failed");
+    } finally {
+      setTestCalling(false);
+    }
+  }
 
   if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>;
 
@@ -176,171 +239,126 @@ export default function DashboardOverviewPage() {
 
   return (
     <motion.div variants={staggerContainer} initial="initial" animate="animate">
-      <motion.div variants={staggerItem} className="mb-6">
-        <h1 className="font-serifDisplay text-3xl font-normal tracking-tight text-foreground">
-          Good morning, {displayName}.
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Your assistant handled{" "}
-          <strong className="text-foreground">
-            {conversationsHandled} conversation{conversationsHandled === 1 ? "" : "s"}
-          </strong>{" "}
-          while you were away.
-        </p>
+      <motion.div variants={staggerItem} className="mb-5 flex flex-wrap items-end justify-between gap-3">
+        <h1 className="font-serifDisplay text-2xl font-normal tracking-tight text-foreground">Good morning, {displayName}.</h1>
+        <div className="flex flex-wrap items-center gap-4 text-sm">
+          <span>
+            <strong className="text-foreground">{suggestions.length}</strong> <span className="text-muted-foreground">actions pending</span>
+          </span>
+          <span>
+            <strong className="text-foreground">{scheduleItems.length}</strong> <span className="text-muted-foreground">site visits today</span>
+          </span>
+          <span className="flex items-center gap-1">
+            <PoundSterling className="h-3.5 w-3.5 text-primary" />
+            <strong className="text-foreground">{fmtGBP(influencedPipeline)}</strong>
+            <span className="text-muted-foreground">pipeline protected</span>
+          </span>
+        </div>
       </motion.div>
 
-      <motion.div variants={staggerContainer} className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
-        <motion.div variants={staggerItem}>
-          <Card className="h-full p-5">
-            <div className="mb-2 flex items-center gap-2">
-              <Bot className="h-4 w-4 text-primary" />
-              <div className="text-sm font-semibold text-foreground">Handled Automatically</div>
-            </div>
-            <ul className="space-y-1 text-sm text-muted-foreground">
-              <li>
-                <strong className="text-foreground">{qualifiedToday}</strong> enquir{qualifiedToday === 1 ? "y" : "ies"} qualified
-              </li>
-              <li>
-                <strong className="text-foreground">{bookedToday}</strong> appointment{bookedToday === 1 ? "" : "s"} booked
-              </li>
-              <li>
-                <strong className="text-foreground">{remindersToday}</strong> quote reminder{remindersToday === 1 ? "" : "s"} sent
-              </li>
-            </ul>
-          </Card>
-        </motion.div>
-
-        <motion.div variants={staggerItem}>
+      <motion.div variants={staggerItem} className="grid grid-cols-1 gap-6 lg:grid-cols-5">
+        {/* Left column — 60% — core operational work */}
+        <div className="space-y-6 lg:col-span-3">
           <Card
-            className="glow-ring h-full p-5"
-            style={{ borderColor: "rgba(var(--color-attention), 0.25)", background: "rgba(var(--color-attention), 0.05)" }}
+            className="glow-ring p-5"
+            style={{ borderColor: "rgba(var(--color-attention), 0.25)", background: "rgba(var(--color-attention), 0.04)" }}
           >
-            <div className="mb-2 flex items-center gap-2">
+            <div className="mb-3 flex items-center gap-2">
               <ClipboardCheck className="h-4 w-4" style={{ color: "rgb(var(--color-attention))" }} />
-              <div className="text-sm font-semibold text-foreground">Needs Your Decision</div>
+              <div className="text-sm font-semibold text-foreground">Urgent Approval Queue</div>
             </div>
-            <p className="mb-3 text-sm text-muted-foreground">
-              <strong className="text-foreground">{suggestions.length}</strong> item{suggestions.length === 1 ? "" : "s"} waiting —
-              discount requests, high-value quotes, and weekend slots.
-            </p>
-            <Button asChild size="sm" variant="outline">
-              <Link href="/dashboard/messages?tab=approval">
-                Review Approval Queue <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
-            </Button>
+            <ApprovalQueueCard
+              suggestions={suggestions.slice(0, 3)}
+              onChange={load}
+              compact
+              onReview={() => router.push("/dashboard/approvals")}
+            />
+            {suggestions.length > 0 && (
+              <button
+                className="mt-3 flex w-full items-center justify-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                onClick={() => router.push("/dashboard/approvals")}
+              >
+                View All Pending Actions ({suggestions.length}) <ArrowRight className="h-3 w-3" />
+              </button>
+            )}
           </Card>
-        </motion.div>
 
-        <motion.div variants={staggerItem}>
-          <Card className="h-full p-5">
-            <div className="mb-2 flex items-center gap-2">
-              <Clock3 className="h-4 w-4 text-primary" />
-              <div className="text-sm font-semibold text-foreground">Time Saved &amp; Value</div>
-              <span title={`Estimated: ${conversationsHandled} conversations × ~${ASSUMED_MINUTES_PER_CONVERSATION} min average manual handling time`}>
-                <Info className="h-3 w-3 text-muted-foreground" />
-              </span>
-            </div>
-            <div className="text-2xl font-semibold text-foreground">{formatMinutes(timeSavedMins)} saved</div>
-            <p className="mb-2 text-[11px] text-muted-foreground">
-              estimated — {conversationsHandled} conversations × ~{ASSUMED_MINUTES_PER_CONVERSATION} min typical manual handling
-            </p>
-            <div className="flex items-center gap-1.5 text-sm">
-              <PoundSterling className="h-3.5 w-3.5 text-primary" />
-              <strong className="text-foreground">{fmtGBP(influencedPipeline)}</strong>
-              <span className="text-muted-foreground">influenced pipeline</span>
+          <Card className="p-5">
+            <div className="mb-3 text-sm font-semibold text-foreground">Today's Schedule &amp; Site Visits</div>
+            <div className="thin-scroll max-h-[400px] overflow-y-auto pr-1">
+              <TodaySchedule items={scheduleItems} />
             </div>
           </Card>
-        </motion.div>
-      </motion.div>
 
-      <motion.div variants={staggerItem}>
-        <LeakageCard suggestions={suggestions} />
-      </motion.div>
-
-      <motion.div variants={staggerItem}>
-        <Card className="mb-6 p-5">
-          <InteractiveChart leads={leads} />
-        </Card>
-      </motion.div>
-
-      <motion.div variants={staggerContainer} className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
-        <motion.div variants={staggerItem}>
-          <StatCard label="Booked" value={bookedCount} icon={CalendarCheck} />
-        </motion.div>
-        <motion.div variants={staggerItem}>
-          <StatCard label="Won" value={wonCount} icon={Sparkles} />
-        </motion.div>
-        <motion.div variants={staggerItem}>
-          <StatCard label="Revenue protected" value={formatPrice(revenue)} icon={PoundSterling} />
-        </motion.div>
-        <motion.div variants={staggerItem}>
-          <StatCard label="Team members" value={staffCount} />
-        </motion.div>
-      </motion.div>
-
-      <motion.div variants={staggerItem}>
-        <Card className="mb-6 p-5">
-          <div className="mb-4 text-sm font-semibold text-foreground">Where things stand right now</div>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            {stageCounts.map((s, i) => (
-              <div key={s.stage} className="flex items-center gap-2">
-                <div className="text-center">
-                  <div className="text-xl font-semibold" style={{ color: `rgb(var(${STATUS_COLOR_VAR[s.stage]}))` }}>
-                    {s.count}
+          <Card className="p-5">
+            <InteractiveChart leads={leads} />
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-4">
+              {stageCounts.map((s, i) => (
+                <div key={s.stage} className="flex items-center gap-2">
+                  <div className="text-center">
+                    <div className="text-lg font-semibold" style={{ color: `rgb(var(${STATUS_COLOR_VAR[s.stage]}))` }}>
+                      {s.count}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground">{s.stage}</div>
                   </div>
-                  <div className="text-[10.5px] text-muted-foreground">{s.stage}</div>
+                  {i < stageCounts.length - 1 && <ArrowRight className="h-3 w-3 text-muted-foreground" />}
                 </div>
-                {i < stageCounts.length - 1 && <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />}
-              </div>
-            ))}
-          </div>
-        </Card>
-      </motion.div>
-
-      <motion.div variants={staggerItem}>
-        <Card className="mb-6 p-5">
-          <div className="mb-3 text-sm font-semibold text-foreground">Assistant activity</div>
-          {activity.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No activity yet.</p>
-          ) : (
-            <div className="divide-y divide-border">
-              {activity.slice(0, 8).map((a) => {
-                const Icon = ACTIVITY_ICON[a.type] ?? Sparkles;
-                return (
-                  <div key={a.id} className="flex items-center gap-3 py-2 text-xs">
-                    <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                    <span className="flex-1 text-foreground">{a.summary}</span>
-                    <span className="shrink-0 text-muted-foreground">{timeAgo(a.created_at)}</span>
-                  </div>
-                );
-              })}
+              ))}
             </div>
-          )}
-          {activity.length > 8 && (
-            <div className="mt-3">
-              <Button asChild size="sm" variant="outline">
-                <Link href="/dashboard/activity">View all activity</Link>
+            <p className="mt-3 text-[11px] text-muted-foreground">
+              Today: {qualifiedToday} qualified · {bookedToday} booked · {remindersToday} reminders sent — {formatMinutes(timeSavedMins)} saved
+              this week (estimated, {conversationsHandled} conversations × ~{ASSUMED_MINUTES_PER_CONVERSATION} min typical handling) · {fmtGBP(revenue)} revenue ({wonCount} won, {bookedCount} booked)
+            </p>
+          </Card>
+        </div>
+
+        {/* Right column — 40% — live AI intelligence & feed */}
+        <div className="space-y-6 lg:col-span-2">
+          <Card className="p-5">
+            <div className="mb-3 text-sm font-semibold text-foreground">Live Assistant Activity</div>
+            {activity.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No activity yet.</p>
+            ) : (
+              <div className="thin-scroll max-h-[400px] divide-y divide-border overflow-y-auto pr-1">
+                {activity.map((a) => {
+                  const Icon = ACTIVITY_ICON[a.type] ?? Sparkles;
+                  return (
+                    <div key={a.id} className="flex items-center gap-3 py-2 text-xs">
+                      <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      <span className="flex-1 text-foreground">{a.summary}</span>
+                      <span className="shrink-0 text-muted-foreground">{timeAgo(a.created_at)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Card>
+
+          <LeakageCard suggestions={suggestions} />
+
+          <Card className="p-5">
+            <div className="mb-3 text-sm font-semibold text-foreground">Quick Actions</div>
+            <div className="space-y-2">
+              <Button variant="outline" className="w-full justify-start" onClick={() => setSimulateOpen(true)}>
+                <Zap className="h-4 w-4" /> Simulate Lead
+              </Button>
+              <Button variant="outline" className="w-full justify-start" onClick={testVoiceCall} disabled={testCalling}>
+                <PhoneCall className="h-4 w-4" /> {testCalling ? "Calling…" : "Test AI Voice Call"}
+              </Button>
+              {testCallResult && <p className="pl-1 text-xs text-muted-foreground">{testCallResult}</p>}
+              <Button variant="outline" className="w-full justify-start" onClick={() => setBroadcastOpen(true)}>
+                <Radio className="h-4 w-4" /> Broadcast Update
               </Button>
             </div>
-          )}
-        </Card>
+          </Card>
+        </div>
       </motion.div>
 
       {currentClient && (
         <motion.div variants={staggerItem}>
-          <Card
-            className="flex flex-wrap items-center gap-4 border-border p-5"
-            style={
-              whiteLabel && currentClient.brand_color
-                ? {
-                    background: `linear-gradient(120deg, ${currentClient.brand_color}25, ${darken(currentClient.brand_color, 40)}20)`,
-                    borderColor: currentClient.brand_color + "40",
-                  }
-                : undefined
-            }
-          >
+          <Card className="mt-6 flex flex-wrap items-center gap-3 p-3">
             <div
-              className="flex h-12 w-12 items-center justify-center rounded-xl text-sm font-bold text-background"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold text-background"
               style={{
                 background:
                   whiteLabel && currentClient.brand_color
@@ -348,30 +366,23 @@ export default function DashboardOverviewPage() {
                     : "linear-gradient(135deg, #fbbf24, #a855f7)",
               }}
             >
-              {currentClient.name
-                .split(" ")
-                .map((w) => w[0])
-                .slice(0, 2)
-                .join("")}
+              {currentClient.name.split(" ").map((w) => w[0]).slice(0, 2).join("")}
             </div>
-            <div className="flex-1">
-              <div className="text-lg font-semibold text-foreground">
-                {whiteLabel ? currentClient.name : `AI EA for ${currentClient.name}`}
-              </div>
-              <div className="text-xs text-muted-foreground">
-                AI Assistant: {currentClient.assistant_name} · {staffCount} team members · {currentClient.vertical}
-              </div>
+            <div className="min-w-0 flex-1 text-xs text-muted-foreground">
+              {whiteLabel ? currentClient.name : `AI EA for ${currentClient.name}`} · {currentClient.assistant_name} · {currentClient.vertical}
             </div>
-            <Button variant="outline" size="sm" onClick={() => setWhiteLabel((v) => !v)}>
-              <Palette className="h-3.5 w-3.5" />
-              {whiteLabel ? `Viewing as ${currentClient.name}'s brand` : "Preview white-label"}
+            <Button variant="ghost" size="sm" onClick={() => setWhiteLabel((v) => !v)}>
+              <Palette className="h-3.5 w-3.5" /> White-label preview
             </Button>
-            <span className="flex items-center gap-1.5 rounded-full border border-green-500/25 bg-green-500/10 px-3 py-1 text-xs text-green-400">
-              <Wifi className="h-3.5 w-3.5" /> Live
+            <span className="flex items-center gap-1.5 rounded-full border border-green-500/25 bg-green-500/10 px-2.5 py-1 text-[11px] text-green-400">
+              <Wifi className="h-3 w-3" /> Live
             </span>
           </Card>
         </motion.div>
       )}
+
+      <SimulateLeadDrawer open={simulateOpen} onOpenChange={setSimulateOpen} />
+      <BroadcastDialog open={broadcastOpen} onOpenChange={setBroadcastOpen} />
     </motion.div>
   );
 }

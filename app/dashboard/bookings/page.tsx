@@ -27,8 +27,18 @@ function fmtGBP(pence: number) {
   return `£${(pence / 100).toFixed(2)}`;
 }
 
+function sortAsc(a: BookingCardData, b: BookingCardData) {
+  if (!a.date && !b.date) return 0;
+  if (!a.date) return 1;
+  if (!b.date) return -1;
+  const dateCmp = a.date.localeCompare(b.date);
+  if (dateCmp !== 0) return dateCmp;
+  return (a.time ?? "").localeCompare(b.time ?? "");
+}
+
 export default function BookingsPage() {
-  const { currentClientId } = useCurrentClient();
+  const { currentClientId, currentClient } = useCurrentClient();
+  const assistantName = currentClient?.assistant_name ?? "your assistant";
   const [leads, setLeads] = useState<(Lead & { staff: { name: string } | null; services: { name: string } | null })[]>([]);
   const [manual, setManual] = useState<(ManualBooking & { staff: { name: string } | null; services: { name: string } | null })[]>([]);
   const [staffList, setStaffList] = useState<Staff[]>([]);
@@ -63,12 +73,12 @@ export default function BookingsPage() {
         .select("*, staff:assigned_staff_id(name), services:service_id(name)")
         .eq("client_id", currentClientId)
         .in("status", ["Booked", "Won"])
-        .order("created_at", { ascending: false }),
+        .order("booking_date", { ascending: true }),
       supabaseBrowser
         .from("manual_bookings")
         .select("*, staff:staff_id(name), services:service_id(name)")
         .eq("client_id", currentClientId)
-        .order("created_at", { ascending: false }),
+        .order("booking_date", { ascending: true }),
       supabaseBrowser.from("staff").select("*").eq("client_id", currentClientId),
       supabaseBrowser.from("services").select("*").eq("client_id", currentClientId),
     ]);
@@ -142,6 +152,7 @@ export default function BookingsPage() {
       staffName: l.staff?.name ?? null,
       date: l.booking_date,
       time: l.booking_time,
+      postcode: l.postcode,
       kind: "lead" as const,
       bookingSource: l.booking_source,
     })),
@@ -153,6 +164,7 @@ export default function BookingsPage() {
       staffName: m.staff?.name ?? null,
       date: m.booking_date,
       time: m.booking_time,
+      postcode: null,
       kind: "manual" as const,
       bookingSource: null,
     })),
@@ -167,6 +179,18 @@ export default function BookingsPage() {
     return t >= now && t <= weekFromNow;
   }).length;
   const avgJobValue = cards.length > 0 ? Math.round(total / cards.length) : 0;
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayAndUpcoming = cards.filter((c) => !c.date || c.date === todayStr).sort(sortAsc);
+  const thisWeek = cards.filter((c) => c.date && c.date > todayStr).sort(sortAsc);
+  const pastJobs = cards
+    .filter((c) => c.date && c.date < todayStr)
+    .sort((a, b) => sortAsc(b, a));
+  const sections: { label: string; items: BookingCardData[] }[] = [
+    { label: "Today & Upcoming", items: todayAndUpcoming },
+    { label: "This Week", items: thisWeek },
+    { label: "Past Jobs", items: pastJobs },
+  ].filter((s) => s.items.length > 0);
 
   if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>;
 
@@ -236,7 +260,7 @@ export default function BookingsPage() {
       {formOpen && (
         <Card className="mb-6 p-5">
           <div className="mb-3 text-sm font-semibold text-foreground">
-            New appointment (booked outside AI EA — walk-in, phone, referral, etc.)
+            New appointment ({assistantName} wasn't involved — walk-in, phone, referral, etc.)
           </div>
           <form onSubmit={submitBooking} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Input
@@ -282,44 +306,70 @@ export default function BookingsPage() {
       {cards.length === 0 ? (
         <Card className="p-6 text-center text-sm text-muted-foreground">No bookings yet for this business.</Card>
       ) : view === "grid" ? (
-        <motion.div
-          variants={staggerContainer}
-          initial="initial"
-          animate="animate"
-          className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
-        >
-          {cards.map((c) => (
-            <motion.div key={c.id} variants={staggerItem}>
-              <BookingCard
-                data={c}
-                onViewDetails={() => {
-                  if (c.kind === "lead") setSelectedLeadId(c.id);
-                  else openManualTarget(manual.find((m) => m.id === c.id)!);
-                }}
-                onReschedule={() => {
-                  if (c.kind === "lead") setSelectedLeadId(c.id);
-                  else openManualTarget(manual.find((m) => m.id === c.id)!);
-                }}
-              />
-            </motion.div>
-          ))}
-        </motion.div>
-      ) : (
-        <Card className="p-5">
-          <div className="space-y-2">
-            {cards.map((c) => (
-              <div key={c.id} className="glow-hover flex items-center gap-3 rounded-lg border border-border p-3">
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium text-foreground">{c.customer}</div>
-                  <div className="truncate text-xs text-muted-foreground">
-                    {c.service} · {c.staffName ?? "Unassigned"} · {c.date ?? "—"} {c.time ?? ""}
-                  </div>
-                </div>
-                <span className="w-20 shrink-0 text-right text-sm font-semibold text-foreground">{fmtGBP(c.price)}</span>
+        <div className="space-y-6">
+          {sections.map((section) => (
+            <div key={section.label}>
+              <div className="mb-2.5 flex items-center gap-2">
+                <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{section.label}</h2>
+                <span className="text-xs text-muted-foreground">({section.items.length})</span>
               </div>
-            ))}
-          </div>
-        </Card>
+              <motion.div
+                variants={staggerContainer}
+                initial="initial"
+                animate="animate"
+                className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
+              >
+                {section.items.map((c) => (
+                  <motion.div key={c.id} variants={staggerItem}>
+                    <BookingCard
+                      data={c}
+                      onViewDetails={() => {
+                        if (c.kind === "lead") setSelectedLeadId(c.id);
+                        else openManualTarget(manual.find((m) => m.id === c.id)!);
+                      }}
+                      onReschedule={() => {
+                        if (c.kind === "lead") setSelectedLeadId(c.id);
+                        else openManualTarget(manual.find((m) => m.id === c.id)!);
+                      }}
+                    />
+                  </motion.div>
+                ))}
+              </motion.div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {sections.map((section) => (
+            <div key={section.label}>
+              <div className="mb-2.5 flex items-center gap-2">
+                <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{section.label}</h2>
+                <span className="text-xs text-muted-foreground">({section.items.length})</span>
+              </div>
+              <Card className="p-5">
+                <motion.div variants={staggerContainer} initial="initial" animate="animate" className="space-y-2">
+                  {section.items.map((c) => (
+                    <motion.div
+                      key={c.id}
+                      variants={staggerItem}
+                      whileHover={{ y: -1, scale: 1.002 }}
+                      className="glow-hover flex items-center gap-3 rounded-lg border border-border p-3"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-medium text-foreground">{c.customer}</div>
+                        <div className="truncate text-xs text-muted-foreground">
+                          {c.service} · {c.staffName ?? "Unassigned"} · {c.date ?? "—"} {c.time ?? ""}
+                          {c.postcode && ` · ${c.postcode}`}
+                        </div>
+                      </div>
+                      <span className="w-20 shrink-0 text-right text-sm font-semibold text-foreground">{fmtGBP(c.price)}</span>
+                    </motion.div>
+                  ))}
+                </motion.div>
+              </Card>
+            </div>
+          ))}
+        </div>
       )}
 
       <Sheet

@@ -16,9 +16,9 @@ export const DEFAULT_TOKENS: ThemeTokens = {
   cardBlur: 12,
   borderOpacity: 0.12,
   fontScale: 1,
-  bgGradientFrom: "rgba(18, 226, 138, 0.06)",
-  bgGradientTo: "rgba(18, 226, 138, 0)",
-  primary: "#12e28a",
+  bgGradientFrom: "rgba(16, 185, 129, 0.06)",
+  bgGradientTo: "rgba(16, 185, 129, 0)",
+  primary: "#10B981",
 };
 
 export const PRESETS: Record<string, { label: string; description: string; tokens: ThemeTokens }> = {

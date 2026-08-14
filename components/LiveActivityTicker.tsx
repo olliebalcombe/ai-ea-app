@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Sparkles, AlertTriangle, CalendarCheck, MessageSquare, Bell, Star, Globe, type LucideIcon } from "lucide-react";
+import { Sparkles, AlertTriangle, CalendarCheck, MessageSquare, Bell, Star, Globe, PhoneCall, type LucideIcon } from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabaseClient";
 import { useCurrentClient } from "@/lib/clientContext";
 import type { ActivityLogEntry, ActivityType } from "@/types";
@@ -16,6 +16,7 @@ const ICON_FOR: Record<ActivityType, LucideIcon> = {
   reminder_sent: Bell,
   review_requested: Star,
   portal_action: Globe,
+  missed_call_recovery: PhoneCall,
 };
 
 const COLOR_FOR: Record<ActivityType, string> = {
@@ -26,6 +27,7 @@ const COLOR_FOR: Record<ActivityType, string> = {
   reminder_sent: "text-sky-400",
   review_requested: "text-amber-400",
   portal_action: "text-sky-400",
+  missed_call_recovery: "text-purple-400",
 };
 
 export default function LiveActivityTicker() {

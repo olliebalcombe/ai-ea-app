@@ -3,8 +3,7 @@ import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { supabaseAdmin } from "@/lib/supabase";
 import { ClientProvider, type ClientMembership } from "@/lib/clientContext";
 import { SandboxProvider } from "@/lib/sandboxContext";
-import DashboardSidebar from "@/components/DashboardSidebar";
-import DashboardHeader from "@/components/DashboardHeader";
+import TopNav from "@/components/TopNav";
 import ThemeTokenLoader from "@/components/ThemeTokenLoader";
 import PageTransition from "@/components/PageTransition";
 import { Toaster } from "@/components/ui/sonner";
@@ -29,16 +28,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
     >
       <SandboxProvider>
         <ThemeTokenLoader />
-        <div className="dashboard-shell-gradient flex h-screen bg-background">
-          <DashboardSidebar />
-          <div className="flex flex-1 flex-col overflow-hidden">
-            <DashboardHeader />
-            <main className="flex-1 overflow-y-auto">
-              <div className="mx-auto max-w-6xl px-6 py-8">
-                <PageTransition>{children}</PageTransition>
-              </div>
-            </main>
-          </div>
+        <div className="dashboard-shell-gradient flex h-screen flex-col bg-background">
+          <TopNav />
+          <main className="relative z-0 flex-1 overflow-y-auto">
+            <div className="mx-auto max-w-6xl px-6 py-8">
+              <PageTransition>{children}</PageTransition>
+            </div>
+          </main>
         </div>
         <Toaster />
       </SandboxProvider>

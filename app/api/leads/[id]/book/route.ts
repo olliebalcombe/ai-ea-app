@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { getAvailableSlots } from "@/lib/scheduling";
 import { sendNotificationForEvent } from "@/lib/notifications";
 import { logActivity } from "@/lib/activityLog";
+import { syncBookingToCalendar } from "@/lib/calendarSync";
 
 /**
  * GET /api/leads/:id/book?staff_id=...
@@ -62,6 +63,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     leadId: params.id,
     type: "booked",
     summary: `Booking confirmed: ${lead.name ?? "a lead"} — ${date} at ${time}${service ? ` (${service.name})` : ""}`,
+  });
+  await syncBookingToCalendar({
+    clientId: lead.client_id,
+    customerName: lead.name ?? "Customer",
+    serviceName: service?.name ?? null,
+    date,
+    time,
   });
 
   return NextResponse.json({ ok: true });

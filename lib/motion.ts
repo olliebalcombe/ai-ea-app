@@ -16,4 +16,7 @@ export const staggerItem: Variants = {
 };
 
 /** Tactile hover feedback for interactive cards/buttons -- spread as a whileHover prop. */
-export const hoverLift = { y: -2, scale: 1.005, transition: { duration: 0.15, ease: "easeOut" } } as const;
+export const hoverLift = { y: -3, scale: 1.005, transition: { duration: 0.15, ease: "easeOut" } } as const;
+
+/** Tactile hover feedback for compact list rows -- a horizontal nudge instead of a lift. */
+export const hoverShift = { scale: 1.01, x: 2, transition: { duration: 0.15, ease: "easeOut" } } as const;

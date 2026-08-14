@@ -153,6 +153,24 @@ function formatKnowledgeBase(entries: KnowledgeBaseEntry[] | null | undefined) {
   return out;
 }
 
+export interface QuestionGuidance {
+  question: string;
+  ai_phrasing: string | null;
+  follow_up_rule: string | null;
+}
+
+function formatQuestionGuidance(guidance: QuestionGuidance[] | null | undefined) {
+  const withGuidance = (guidance ?? []).filter((g) => g.ai_phrasing || g.follow_up_rule);
+  if (withGuidance.length === 0) return "";
+  const lines = withGuidance.map((g) => {
+    let line = `- ${g.question}`;
+    if (g.ai_phrasing) line += `: ask it like "${g.ai_phrasing}"`;
+    if (g.follow_up_rule) line += ` (${g.follow_up_rule})`;
+    return line;
+  });
+  return `\n\nHow to ask these specific outstanding questions, when you get to them naturally:\n${lines.join("\n")}`;
+}
+
 export function buildSystemPrompt(opts: {
   vertical: string;
   businessName: string;
@@ -161,8 +179,9 @@ export function buildSystemPrompt(opts: {
   toneStyle: ToneStyle;
   businessNuances: string | null;
   knowledgeBase?: KnowledgeBaseEntry[] | null;
+  questionGuidance?: QuestionGuidance[] | null;
 }) {
-  const { vertical, businessName, assistantName, channel, toneStyle, businessNuances, knowledgeBase } = opts;
+  const { vertical, businessName, assistantName, channel, toneStyle, businessNuances, knowledgeBase, questionGuidance } = opts;
 
   const conciseness =
     channel === "sms"
@@ -174,6 +193,7 @@ export function buildSystemPrompt(opts: {
     : "";
 
   const knowledge = formatKnowledgeBase(knowledgeBase);
+  const guidance = formatQuestionGuidance(questionGuidance);
 
   return `You are ${assistantName}, a calm, sharp, highly competent human assistant answering enquiries for ${businessName}, a ${vertical} business.
 
@@ -190,7 +210,7 @@ Rules:
 - Never use any of these phrases or their close equivalents: ${BANNED_PHRASES.map((p) => `"${p}"`).join(", ")}.
 - If the person's answer touches something sensitive or distressing (an injury, an accident, a safeguarding concern), respond with genuine empathy first -- never with a casual "Great!" or "Lovely" after bad news.
 - If you detect anything suggesting a genuine emergency, medical crisis, or safeguarding risk, do not continue the standard flow -- tell the person you're connecting them with the team right away, and flag this conversation for immediate human review.
-- When you have everything you need, thank them by name if you know it, and let them know the team will be in touch shortly.${nuances}${knowledge}
+- When you have everything you need, thank them by name if you know it, and let them know the team will be in touch shortly.${nuances}${knowledge}${guidance}
 
 Stay strictly in character as ${assistantName} from ${businessName}. Do not mention that you are an AI unless directly and explicitly asked.`;
 }

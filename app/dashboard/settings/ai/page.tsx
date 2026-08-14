@@ -1,10 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { PhoneCall } from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabaseClient";
 import { useCurrentClient } from "@/lib/clientContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -14,35 +17,44 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { TONE_OPTIONS } from "@/lib/toneOptions";
 import type { ToneStyle } from "@/types";
 
-const TONE_OPTIONS: { value: ToneStyle; label: string; description: string }[] = [
-  { value: "calm_direct", label: "Calm & Direct", description: "Grounded and matter-of-fact — the default." },
-  { value: "warm_friendly", label: "Warm & Friendly", description: "A bit more personable, still natural." },
-  { value: "formal_executive", label: "Formal / Executive", description: "Professional, no slang or casual contractions." },
+const VOICE_OPTIONS = [
+  { value: "Polly.Amy", label: "Amy — Female (British)" },
+  { value: "Polly.Brian", label: "Brian — Male (British)" },
+  { value: "Polly.Emma", label: "Emma — Female (British)" },
+  { value: "Polly.Arthur", label: "Arthur — Male (British)" },
 ];
 
 export default function AiSettingsPage() {
+  const router = useRouter();
   const { currentClientId } = useCurrentClient();
+  const [assistantName, setAssistantName] = useState("");
   const [toneStyle, setToneStyle] = useState<ToneStyle>("calm_direct");
   const [nuances, setNuances] = useState("");
+  const [voiceStyle, setVoiceStyle] = useState("Polly.Amy");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [testCalling, setTestCalling] = useState(false);
+  const [testCallResult, setTestCallResult] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!currentClientId) return;
     setLoading(true);
     const { data, error } = await supabaseBrowser
       .from("clients")
-      .select("tone_style, business_nuances")
+      .select("assistant_name, tone_style, business_nuances, voice_style")
       .eq("id", currentClientId)
       .single();
     if (error) setError(error.message);
     else {
+      setAssistantName(data?.assistant_name ?? "");
       setToneStyle((data?.tone_style as ToneStyle) ?? "calm_direct");
       setNuances(data?.business_nuances ?? "");
+      setVoiceStyle(data?.voice_style ?? "Polly.Amy");
     }
     setLoading(false);
   }, [currentClientId]);
@@ -52,18 +64,44 @@ export default function AiSettingsPage() {
   }, [load]);
 
   async function save() {
-    if (!currentClientId) return;
+    if (!currentClientId || !assistantName.trim()) return;
     setSaving(true);
     setError(null);
     const { error } = await supabaseBrowser
       .from("clients")
-      .update({ tone_style: toneStyle, business_nuances: nuances || null })
+      .update({
+        assistant_name: assistantName.trim(),
+        tone_style: toneStyle,
+        business_nuances: nuances || null,
+        voice_style: voiceStyle,
+      })
       .eq("id", currentClientId);
     setSaving(false);
     if (error) setError(error.message);
     else {
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
+      router.refresh();
+    }
+  }
+
+  async function testCall() {
+    if (!currentClientId) return;
+    setTestCalling(true);
+    setTestCallResult(null);
+    try {
+      const res = await fetch("/api/voice/test-call", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ client_id: currentClientId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Call failed");
+      setTestCallResult(`Calling ${data.calledNumber} now — pick up to hear it.`);
+    } catch (e) {
+      setTestCallResult(e instanceof Error ? e.message : "Call failed");
+    } finally {
+      setTestCalling(false);
     }
   }
 
@@ -72,6 +110,27 @@ export default function AiSettingsPage() {
   return (
     <div className="max-w-xl space-y-6">
       {error && <p className="text-sm text-destructive">{error}</p>}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Assistant Identity</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <Label htmlFor="assistant-name" className="sr-only">
+            Assistant name
+          </Label>
+          <Input
+            id="assistant-name"
+            value={assistantName}
+            onChange={(e) => setAssistantName(e.target.value)}
+            placeholder="e.g. Jack"
+          />
+          <p className="text-xs text-muted-foreground">
+            The name used everywhere your assistant appears — conversations, voice calls, outbound emails, and this
+            dashboard.
+          </p>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -118,8 +177,39 @@ export default function AiSettingsPage() {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Voice</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Select value={voiceStyle} onValueChange={setVoiceStyle}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {VOICE_OPTIONS.map((v) => (
+                <SelectItem key={v.value} value={v.value}>
+                  {v.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            Twilio's own built-in voice, used for the missed-call callback and any AI voice line —
+            real today, no separate signup needed.
+          </p>
+          <div className="flex items-center gap-3 border-t border-border pt-3">
+            <Button size="sm" variant="outline" onClick={testCall} disabled={testCalling}>
+              <PhoneCall className="h-3.5 w-3.5" />
+              {testCalling ? "Calling…" : "Test Call My Phone"}
+            </Button>
+            {testCallResult && <span className="text-xs text-muted-foreground">{testCallResult}</span>}
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="flex items-center gap-3">
-        <Button onClick={save} disabled={saving}>
+        <Button onClick={save} disabled={saving || !assistantName.trim()}>
           {saving ? "Saving…" : "Save changes"}
         </Button>
         {saved && <span className="text-sm text-green-400">Saved.</span>}

@@ -71,7 +71,7 @@
   }
   .dark {
 
-    --background: oklch(0.141 0.005 285.823);
+    --background: #0B0F12;
 
     --foreground: oklch(0.985 0 0);
 
@@ -83,7 +83,7 @@
 
     --popover-foreground: oklch(0.985 0 0);
 
-    --primary: #12e28a;
+    --primary: #10B981;
 
     --primary-foreground: #04140c;
 
@@ -105,7 +105,7 @@
 
     --input: oklch(1 0 0 / 15%);
 
-    --ring: #12e28a;
+    --ring: #10B981;
 
     --chart-1: oklch(0.871 0.006 286.286);
 
@@ -138,16 +138,17 @@
     --card-blur: 12px;
     --border-opacity: 0.12;
     --font-scale: 1;
-    --bg-gradient-from: rgba(18, 226, 138, 0.06);
-    --bg-gradient-to: rgba(18, 226, 138, 0);
-    --primary-rgb: 18, 226, 138;
+    --bg-gradient-from: rgba(16, 185, 129, 0.06);
+    --bg-gradient-to: rgba(16, 185, 129, 0);
+    --primary-rgb: 16, 185, 129;
 
     /* Semantic action colors for the Morning Briefing / Approval Queue / Leakage
        UI -- distinct from StatusBadge's pipeline-stage colors, which stay as-is. */
-    --color-attention: 245, 158, 11; /* amber -- needs a decision */
-    --color-risk: 239, 68, 68; /* coral/red -- at risk, revenue leakage */
-    --color-ai: 168, 85, 247; /* violet -- AI-drafted/generated */
+    --color-attention: 230, 168, 74; /* #E6A84A amber -- needs a decision */
+    --color-risk: 217, 108, 95; /* #D96C5F coral -- at risk, revenue leakage */
+    --color-ai: 139, 92, 246; /* #8B5CF6 violet -- AI-drafted/generated */
     --color-info: 148, 163, 184; /* slate -- informational */
+    --color-handled: 63, 178, 127; /* #3FB27F calmer green for "Handled" pills, distinct from --primary-rgb's brand accent */
   }
 }
 @layer base {
@@ -168,7 +169,7 @@
 }
 
 .glow-ring {
-  box-shadow: 0 0 40px -8px rgba(var(--primary-rgb, 18, 226, 138), calc(var(--glow-intensity, 0.7) * 0.5));
+  box-shadow: 0 0 40px -8px rgba(var(--primary-rgb, 16, 185, 129), calc(var(--glow-intensity, 0.7) * 0.5));
 }
 
 .glow-hover {
@@ -176,8 +177,24 @@
 }
 
 .glow-hover:hover {
-  border-color: rgba(var(--primary-rgb, 18, 226, 138), 0.3);
-  box-shadow: 0 0 20px rgba(var(--primary-rgb, 18, 226, 138), calc(var(--glow-intensity, 0.7) * 0.17));
+  border-color: rgba(var(--primary-rgb, 16, 185, 129), 0.3);
+  box-shadow: 0 0 20px rgba(var(--primary-rgb, 16, 185, 129), calc(var(--glow-intensity, 0.7) * 0.17));
+}
+
+/* Slim, low-contrast scrollbar for clamped dashboard panels -- present but unobtrusive, not fully hidden. */
+.thin-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+}
+.thin-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.thin-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.thin-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
 }
 
 @keyframes ticker-scroll {

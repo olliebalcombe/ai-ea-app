@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { getAvailableSlots } from "@/lib/scheduling";
 import { sendNotificationForEvent } from "@/lib/notifications";
 import { logActivity } from "@/lib/activityLog";
+import { syncBookingToCalendar } from "@/lib/calendarSync";
 
 /**
  * POST /api/portal/:id/book
@@ -40,6 +41,17 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     leadId: params.id,
     type: "portal_action",
     summary: `${lead.name ?? "A customer"} booked a site visit via the portal — ${date} at ${time}`,
+  });
+
+  const { data: service } = lead.service_id
+    ? await supabaseAdmin.from("services").select("name").eq("id", lead.service_id).single()
+    : { data: null };
+  await syncBookingToCalendar({
+    clientId: lead.client_id,
+    customerName: lead.name ?? "Customer",
+    serviceName: service?.name ?? null,
+    date,
+    time,
   });
 
   return NextResponse.json({ ok: true });

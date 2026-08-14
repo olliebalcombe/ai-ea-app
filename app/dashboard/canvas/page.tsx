@@ -34,6 +34,7 @@ function respLabel(sec: number) {
 
 export default function CanvasPage() {
   const { currentClientId, currentClient } = useCurrentClient();
+  const assistantName = currentClient?.assistant_name ?? "your assistant";
   const { sandbox } = useSandbox();
 
   const [loading, setLoading] = useState(true);
@@ -178,8 +179,8 @@ export default function CanvasPage() {
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {wonLeads.length > 0
-            ? "A real enquiry from your own history, before and after the AI EA."
-            : "No won jobs yet — run a live example to see the AI EA in action."}
+            ? `A real enquiry from your own history, before and after ${assistantName}.`
+            : `No won jobs yet — run a live example to see ${assistantName} in action.`}
         </p>
       </div>
 
@@ -204,7 +205,7 @@ export default function CanvasPage() {
       <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div>
           <div className="mb-2 flex items-center gap-2 text-xs font-medium text-muted-foreground">
-            <XCircle className="h-3.5 w-3.5 text-rose-400" /> Without AI EA
+            <XCircle className="h-3.5 w-3.5 text-rose-400" /> Without {assistantName}
           </div>
           <ViewportFrame title="Missed call / unanswered text">
             <div className="space-y-3 p-4">
@@ -224,7 +225,7 @@ export default function CanvasPage() {
 
         <div>
           <div className="mb-2 flex items-center gap-2 text-xs font-medium text-primary">
-            <CheckCheck className="h-3.5 w-3.5" /> With AI EA
+            <CheckCheck className="h-3.5 w-3.5" /> With {assistantName}
           </div>
           <ViewportFrame title="Instant AI response" className="glow-ring">
             <div className="space-y-3 p-4">

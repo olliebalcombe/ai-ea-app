@@ -36,7 +36,7 @@ const HOUR_BUCKETS = [
 // whatever theme/preset the business has picked instead of ignoring it.
 const BAR_OPACITIES = [1, 0.75, 0.55, 0.4, 0.28];
 function barColor(i: number) {
-  return `rgba(var(--primary-rgb, 18, 226, 138), ${BAR_OPACITIES[i % BAR_OPACITIES.length]})`;
+  return `rgba(var(--primary-rgb, 16, 185, 129), ${BAR_OPACITIES[i % BAR_OPACITIES.length]})`;
 }
 
 function fmtGBP(pence: number) {
@@ -59,7 +59,8 @@ const chartTooltip = {
 };
 
 export default function ReportsPage() {
-  const { currentClientId } = useCurrentClient();
+  const { currentClientId, currentClient } = useCurrentClient();
+  const assistantName = currentClient?.assistant_name ?? "your assistant";
   const [leads, setLeads] = useState<LeadRow[]>([]);
   const [manual, setManual] = useState<ManualBooking[]>([]);
   const [staffList, setStaffList] = useState<Staff[]>([]);
@@ -156,7 +157,7 @@ export default function ReportsPage() {
           <div className="text-xs uppercase tracking-wide text-muted-foreground">Revenue protected this month</div>
           <div className="text-2xl font-semibold text-amber-400">{fmtGBP(revenue)}</div>
           <div className="mt-0.5 text-xs text-muted-foreground">
-            from bookings the AI EA captured that would otherwise likely have been missed
+            from bookings {assistantName} captured that would otherwise likely have been missed
           </div>
         </div>
       </Card>
@@ -224,7 +225,7 @@ export default function ReportsPage() {
               <XAxis dataKey="staff" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
               <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} allowDecimals={false} />
               <Tooltip {...chartTooltip} cursor={{ fill: "hsl(var(--muted))" }} />
-              <Bar dataKey="count" fill="rgb(var(--primary-rgb, 18, 226, 138))" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="count" fill="rgb(var(--primary-rgb, 16, 185, 129))" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </Card>
@@ -256,9 +257,9 @@ export default function ReportsPage() {
               <Line
                 type="monotone"
                 dataKey="secs"
-                stroke="rgb(var(--primary-rgb, 18, 226, 138))"
+                stroke="rgb(var(--primary-rgb, 16, 185, 129))"
                 strokeWidth={2.5}
-                dot={{ fill: "rgb(var(--primary-rgb, 18, 226, 138))", r: 3 }}
+                dot={{ fill: "rgb(var(--primary-rgb, 16, 185, 129))", r: 3 }}
               />
             </LineChart>
           </ResponsiveContainer>

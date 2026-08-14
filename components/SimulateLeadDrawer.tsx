@@ -12,6 +12,11 @@ import {
   ArrowRight,
   MessageSquarePlus,
   ArrowLeft,
+  Layers,
+  Smartphone,
+  Voicemail,
+  ChevronDown,
+  Clock,
   type LucideIcon,
 } from "lucide-react";
 import { useCurrentClient } from "@/lib/clientContext";
@@ -27,12 +32,21 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import MentionAutocomplete from "@/components/MentionAutocomplete";
 import ViewportFrame from "@/components/ViewportFrame";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-type Mode = "book" | "escalate" | "price_objection" | "reschedule" | "custom";
+type Mode =
+  | "quick_booking"
+  | "multi_room"
+  | "escalate"
+  | "price_objection"
+  | "reschedule"
+  | "missed_call_mobile"
+  | "missed_call_landline"
+  | "custom";
 
 interface ExtractedAnswer {
   question: string;
@@ -58,28 +72,60 @@ interface Scenario {
   successDescription: string;
 }
 
-const SCENARIOS: Scenario[] = [
+const PRIMARY_SCENARIOS: Scenario[] = [
   {
-    mode: "book",
+    mode: "quick_booking",
     icon: CalendarCheck,
     iconBg: "bg-primary/15",
     iconColor: "text-primary",
-    title: "Standard Booking",
-    description:
-      "Captures a lead, qualifies it, picks a real staff member and service, and books a slot automatically.",
+    title: "Quick Site Visit Booking",
+    description: "Short — a single message requesting an immediate quote and a site visit slot.",
     successTitle: "Lead booked!",
     successDescription: "A test lead was captured, qualified, and booked.",
   },
   {
+    mode: "multi_room",
+    icon: Layers,
+    iconBg: "bg-sky-500/15",
+    iconColor: "text-sky-400",
+    title: "Multi-Room Renovation Inquiry",
+    description: "Long — a 5-turn conversation covering material options, sq/m rates, and a sample request.",
+    successTitle: "Lead booked!",
+    successDescription: "A detailed renovation enquiry was qualified and booked.",
+  },
+  {
     mode: "escalate",
     icon: AlertTriangle,
-    iconBg: "bg-amber-500/15",
-    iconColor: "text-amber-400",
-    title: "Complex / Custom Request",
-    description: "AI identifies an edge case outside the standard flow and flags it for urgent team handoff.",
+    iconBg: "bg-rose-500/15",
+    iconColor: "text-rose-400",
+    title: "Customer Complaint / Escalation",
+    description: "Urgent — an angry customer demands a refund or a manager callback. Tests the AI Pause & Escalation rule.",
     successTitle: "Escalated to team",
     successDescription: "A test lead was captured and flagged high-priority for manual takeover.",
   },
+  {
+    mode: "missed_call_mobile",
+    icon: Smartphone,
+    iconBg: "bg-emerald-500/15",
+    iconColor: "text-emerald-400",
+    title: "Missed Call Handoff",
+    description: "A missed call from a mobile number — tests the automatic text-message recovery.",
+    successTitle: "Recovery text sent",
+    successDescription: "A missed mobile call was recovered with an instant text.",
+  },
+  {
+    mode: "missed_call_landline",
+    icon: Voicemail,
+    iconBg: "bg-violet-500/15",
+    iconColor: "text-violet-400",
+    title: "Landline Missed Call",
+    description: "A missed call from a landline — tests the automated outbound voice callback.",
+    successTitle: "Voice callback placed",
+    successDescription: "A missed landline call triggered an outbound AI voice callback.",
+  },
+];
+
+const SECONDARY_SCENARIOS: Scenario[] = [
   {
     mode: "price_objection",
     icon: PoundSterling,
@@ -109,7 +155,8 @@ export default function SimulateLeadDrawer({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const { currentClientId } = useCurrentClient();
+  const { currentClientId, currentClient } = useCurrentClient();
+  const assistantName = currentClient?.assistant_name ?? "your assistant";
   const { sandbox } = useSandbox();
   const router = useRouter();
   const [running, setRunning] = useState(false);
@@ -118,6 +165,8 @@ export default function SimulateLeadDrawer({
   const [revealedCount, setRevealedCount] = useState(0);
   const [draft, setDraft] = useState<unknown>(null);
   const [merging, setMerging] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [realisticDelay, setRealisticDelay] = useState(false);
 
   const [customMode, setCustomMode] = useState(false);
   const [customText, setCustomText] = useState("");
@@ -134,6 +183,7 @@ export default function SimulateLeadDrawer({
     setCustomText("");
     setMentionFragment(null);
     setResolvedMentions([]);
+    setMoreOpen(false);
   }
 
   function onCustomTextChange(value: string) {
@@ -175,6 +225,11 @@ export default function SimulateLeadDrawer({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Simulation failed");
+
+      if (realisticDelay) {
+        toast.loading(`${assistantName} is processing…`, { id: toastId });
+        await sleep(5000);
+      }
 
       if (sandbox) {
         toast.success("Ran in Sandbox — review below before merging", { id: toastId });
@@ -230,6 +285,11 @@ export default function SimulateLeadDrawer({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Simulation failed");
+
+      if (realisticDelay) {
+        toast.loading(`${assistantName} is processing…`, { id: toastId });
+        await sleep(5000);
+      }
 
       if (sandbox) {
         toast.success("Ran in Sandbox — review below before merging", { id: toastId });
@@ -289,9 +349,9 @@ export default function SimulateLeadDrawer({
     >
       <SheetContent className="w-full overflow-y-auto sm:max-w-lg">
         <SheetHeader>
-          <SheetTitle>⚡ Simulate Lead</SheetTitle>
+          <SheetTitle>Simulate Lead</SheetTitle>
           <SheetDescription>
-            Runs a real test lead through the pipeline against your current business — the AI
+            Runs a real test lead through the pipeline against your current business — {assistantName}'s
             replies and extracted data below are genuine Claude output, not scripted.
             {sandbox
               ? " Sandbox Mode is on: nothing writes to production until you merge it."
@@ -301,7 +361,20 @@ export default function SimulateLeadDrawer({
 
         {!thoughtStream && !customMode && (
           <div className="mt-6 space-y-3">
-            {SCENARIOS.map((s) => {
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-secondary/20 px-3.5 py-2.5">
+              <div className="flex items-center gap-2">
+                <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                <div>
+                  <div className="text-xs font-medium text-foreground">Processing Delay</div>
+                  <div className="text-[10px] text-muted-foreground">
+                    {realisticDelay ? "Realistic — ~5s before results appear" : "Instant — results appear as soon as they're ready"}
+                  </div>
+                </div>
+              </div>
+              <Switch checked={realisticDelay} onCheckedChange={setRealisticDelay} />
+            </div>
+
+            {PRIMARY_SCENARIOS.map((s) => {
               const Icon = s.icon;
               return (
                 <button
@@ -320,6 +393,35 @@ export default function SimulateLeadDrawer({
                 </button>
               );
             })}
+
+            <button
+              onClick={() => setMoreOpen((v) => !v)}
+              className="flex w-full items-center justify-between gap-2 rounded-lg px-1 py-1 text-left text-xs font-medium text-muted-foreground hover:text-foreground"
+            >
+              More scenarios
+              <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", moreOpen && "rotate-180")} />
+            </button>
+
+            {moreOpen &&
+              SECONDARY_SCENARIOS.map((s) => {
+                const Icon = s.icon;
+                return (
+                  <button
+                    key={s.mode}
+                    onClick={() => runScenario(s)}
+                    disabled={running}
+                    className="flex w-full items-start gap-3 rounded-lg border border-white/10 bg-secondary/30 p-4 text-left transition-colors hover:border-primary/40 hover:bg-primary/5 disabled:opacity-50"
+                  >
+                    <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg", s.iconBg)}>
+                      <Icon className={cn("h-4 w-4", s.iconColor)} />
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-foreground">{s.title}</div>
+                      <div className="mt-0.5 text-xs text-muted-foreground">{s.description}</div>
+                    </div>
+                  </button>
+                );
+              })}
 
             <button
               onClick={() => setCustomMode(true)}

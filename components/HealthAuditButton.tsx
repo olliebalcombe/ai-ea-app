@@ -21,7 +21,8 @@ interface Finding {
 }
 
 export default function HealthAuditButton() {
-  const { currentClientId } = useCurrentClient();
+  const { currentClientId, currentClient } = useCurrentClient();
+  const assistantName = currentClient?.assistant_name ?? "your assistant";
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -70,15 +71,15 @@ export default function HealthAuditButton() {
     if (!categories.has("pricing_rule")) {
       found.push({
         label: "No pricing rules in Knowledge Base",
-        detail: "The AI has nothing to ground pricing conversations in.",
-        href: "/dashboard/knowledge-base",
+        detail: `${assistantName} has nothing to ground pricing conversations in.`,
+        href: "/dashboard/business-memory",
       });
     }
     if (!categories.has("faq")) {
       found.push({
         label: "No FAQs in Knowledge Base",
         detail: "Common customer questions have no grounded answers configured.",
-        href: "/dashboard/knowledge-base",
+        href: "/dashboard/business-memory",
       });
     }
     if (!staffCount) {
@@ -91,7 +92,7 @@ export default function HealthAuditButton() {
     if (!serviceCount) {
       found.push({
         label: "No services configured",
-        detail: "The AI has no services to qualify leads against.",
+        detail: `${assistantName} has no services to qualify leads against.`,
         href: "/dashboard/settings/services",
       });
     }
@@ -127,10 +128,10 @@ export default function HealthAuditButton() {
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent className="w-full overflow-y-auto sm:max-w-md">
           <SheetHeader>
-            <SheetTitle>AI Pre-flight Health Audit</SheetTitle>
+            <SheetTitle>{assistantName}'s Pre-flight Health Audit</SheetTitle>
             <SheetDescription>
               Real checks against your data — unassigned work, gaps in the knowledge base, and stale
-              bookings the AI can't resolve on its own.
+              bookings {assistantName} can't resolve on its own.
             </SheetDescription>
           </SheetHeader>
 

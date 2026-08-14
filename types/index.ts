@@ -26,6 +26,7 @@ export interface Client {
   theme_tokens: Record<string, unknown> | null;
   enabled_skills: string[];
   google_review_link: string | null;
+  voice_style: string;
 }
 
 export interface Staff {
@@ -54,6 +55,9 @@ export interface QualifyingQuestion {
   client_id: string;
   question: string;
   display_order: number;
+  ai_phrasing: string | null;
+  mandatory: boolean;
+  follow_up_rule: string | null;
 }
 
 export interface Lead {
@@ -172,7 +176,8 @@ export type ActivityType =
   | "message_sent"
   | "reminder_sent"
   | "review_requested"
-  | "portal_action";
+  | "portal_action"
+  | "missed_call_recovery";
 
 export interface ActivityLogEntry {
   id: string;
@@ -202,4 +207,11 @@ export interface LeadSuggestion {
   status: SuggestionStatus;
   created_at: string;
   resolved_at: string | null;
+}
+
+/** Client-side status view only -- never selects access_token/refresh_token. */
+export interface CalendarConnectionStatus {
+  provider: "google" | "outlook";
+  connected_email: string | null;
+  expires_at: string | null;
 }

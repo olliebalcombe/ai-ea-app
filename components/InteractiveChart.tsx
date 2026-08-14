@@ -137,9 +137,9 @@ export default function InteractiveChart({ leads }: { leads: Lead[] }) {
           <Line
             type="monotone"
             dataKey="value"
-            stroke="rgb(var(--primary-rgb, 18, 226, 138))"
+            stroke="rgb(var(--primary-rgb, 16, 185, 129))"
             strokeWidth={2.5}
-            dot={{ fill: "rgb(var(--primary-rgb, 18, 226, 138))", r: 3 }}
+            dot={{ fill: "rgb(var(--primary-rgb, 16, 185, 129))", r: 3 }}
           />
         </LineChart>
       </ResponsiveContainer>

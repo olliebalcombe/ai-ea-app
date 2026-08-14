@@ -2,19 +2,24 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Phone, MessageSquare, Mail } from "lucide-react";
+import { motion } from "framer-motion";
+import { Phone, MessageSquare, Mail, Sparkles, ArrowRight } from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabaseClient";
 import { useCurrentClient } from "@/lib/clientContext";
 import { cn } from "@/lib/utils";
+import { staggerContainer, staggerItem, hoverShift } from "@/lib/motion";
 import ApprovalQueueCard from "@/components/ApprovalQueueCard";
+import StatusBadge from "@/components/StatusBadge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import type { Lead, LeadMessage, LeadSuggestion } from "@/types";
 
 const CHANNEL_META = {
-  call: { icon: Phone, label: "Missed Call" },
+  call: { icon: Phone, label: "Voice" },
   sms: { icon: MessageSquare, label: "Text" },
   email: { icon: Mail, label: "Email" },
 };
+
+type SuggestionRow = LeadSuggestion & { leads: { name: string | null } | null };
 
 function initial(lead: Lead) {
   return (lead.name ?? "?")[0]?.toUpperCase() ?? "?";
@@ -30,7 +35,17 @@ function timeAgo(iso: string) {
   return `${Math.floor(hours / 24)}d`;
 }
 
-function ConversationList({ leads, activeId, onSelect }: { leads: Lead[]; activeId: string | null; onSelect: (id: string) => void }) {
+function ConversationList({
+  leads,
+  activeId,
+  onSelect,
+  suggestionsByLead,
+}: {
+  leads: Lead[];
+  activeId: string | null;
+  onSelect: (id: string) => void;
+  suggestionsByLead: Map<string, SuggestionRow>;
+}) {
   const [messages, setMessages] = useState<LeadMessage[]>([]);
   const active = leads.find((l) => l.id === activeId) ?? null;
 
@@ -49,17 +64,26 @@ function ConversationList({ leads, activeId, onSelect }: { leads: Lead[]; active
 
   return (
     <div className="flex overflow-hidden rounded-lg border border-border" style={{ height: "calc(100vh - 14rem)" }}>
-      <div className="w-72 shrink-0 overflow-y-auto border-r border-border p-2">
+      <motion.div
+        variants={staggerContainer}
+        initial="initial"
+        animate="animate"
+        className="w-80 shrink-0 overflow-y-auto border-r border-border p-2"
+      >
         {leads.length === 0 && <p className="p-4 text-sm text-muted-foreground">No conversations here.</p>}
         {leads.map((l) => {
           const Icon = CHANNEL_META[l.channel].icon;
           const isActive = l.id === activeId;
+          const suggestion = suggestionsByLead.get(l.id);
+          const aiHandled = !suggestion && l.status !== "Qualified" && !l.ai_paused;
           return (
-            <div
+            <motion.div
               key={l.id}
+              variants={staggerItem}
+              whileHover={hoverShift}
               onClick={() => onSelect(l.id)}
               className={cn(
-                "mb-1 flex cursor-pointer items-center gap-2.5 rounded-lg p-2.5 hover:bg-accent",
+                "mb-1 flex cursor-pointer items-start gap-2.5 rounded-lg p-2.5 hover:bg-accent",
                 isActive && "bg-primary/10"
               )}
             >
@@ -71,15 +95,26 @@ function ConversationList({ leads, activeId, onSelect }: { leads: Lead[]; active
                   <span className="truncate text-sm font-medium text-foreground">{l.name ?? "Unknown"}</span>
                   <span className="shrink-0 text-[10px] text-muted-foreground">{timeAgo(l.created_at)}</span>
                 </div>
-                <div className="truncate text-xs text-muted-foreground">{CHANNEL_META[l.channel].label}</div>
+                <div className="mt-0.5 flex items-center gap-1.5">
+                  <span className="flex items-center gap-1 rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground">
+                    <Icon className="h-2.5 w-2.5" /> {CHANNEL_META[l.channel].label}
+                  </span>
+                  <StatusBadge status={l.status} />
+                </div>
+                {suggestion ? (
+                  <div className="mt-1 flex items-center gap-1 truncate text-[11px]" style={{ color: "rgb(var(--color-attention))" }}>
+                    <ArrowRight className="h-2.5 w-2.5 shrink-0" /> {suggestion.reason}
+                  </div>
+                ) : aiHandled ? (
+                  <div className="mt-1 flex items-center gap-1 text-[11px]" style={{ color: "rgb(var(--color-handled, var(--primary-rgb)))" }}>
+                    <Sparkles className="h-2.5 w-2.5 shrink-0" /> AI handled
+                  </div>
+                ) : null}
               </div>
-              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-muted">
-                <Icon className="h-3 w-3 text-muted-foreground" />
-              </div>
-            </div>
+            </motion.div>
           );
         })}
-      </div>
+      </motion.div>
 
       <div className="flex flex-1 flex-col overflow-hidden">
         {active ? (
@@ -123,11 +158,11 @@ function ConversationList({ leads, activeId, onSelect }: { leads: Lead[]; active
   );
 }
 
-export default function MessagesPage() {
+export default function InboxPage() {
   const { currentClientId } = useCurrentClient();
   const searchParams = useSearchParams();
   const [leads, setLeads] = useState<Lead[]>([]);
-  const [suggestions, setSuggestions] = useState<(LeadSuggestion & { leads: { name: string | null } | null })[]>([]);
+  const [suggestions, setSuggestions] = useState<SuggestionRow[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -146,7 +181,7 @@ export default function MessagesPage() {
     const rows = (leadsData as Lead[]) ?? [];
     setLeads(rows);
     setActiveId((prev) => prev ?? rows[0]?.id ?? null);
-    setSuggestions((suggestionsData as unknown as (LeadSuggestion & { leads: { name: string | null } | null })[]) ?? []);
+    setSuggestions((suggestionsData as unknown as SuggestionRow[]) ?? []);
     setLoading(false);
   }, [currentClientId]);
 
@@ -158,6 +193,7 @@ export default function MessagesPage() {
 
   const needsMe = leads.filter((l) => l.status === "Qualified" || l.ai_paused);
   const handled = leads.filter((l) => l.status !== "Qualified" && !l.ai_paused);
+  const suggestionsByLead = new Map(suggestions.map((s) => [s.lead_id, s]));
 
   return (
     <div>
@@ -166,11 +202,11 @@ export default function MessagesPage() {
         <TabsList className="mb-4">
           <TabsTrigger value="handled">Handled ({handled.length})</TabsTrigger>
           <TabsTrigger value="approval">Approval ({suggestions.length})</TabsTrigger>
-          <TabsTrigger value="needsme">Needs Me ({needsMe.length})</TabsTrigger>
+          <TabsTrigger value="needsme">Needs you ({needsMe.length})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="handled" className="mt-0">
-          <ConversationList leads={handled} activeId={activeId} onSelect={setActiveId} />
+          <ConversationList leads={handled} activeId={activeId} onSelect={setActiveId} suggestionsByLead={suggestionsByLead} />
         </TabsContent>
 
         <TabsContent value="approval" className="mt-0">
@@ -178,7 +214,7 @@ export default function MessagesPage() {
         </TabsContent>
 
         <TabsContent value="needsme" className="mt-0">
-          <ConversationList leads={needsMe} activeId={activeId} onSelect={setActiveId} />
+          <ConversationList leads={needsMe} activeId={activeId} onSelect={setActiveId} suggestionsByLead={suggestionsByLead} />
         </TabsContent>
       </Tabs>
     </div>
