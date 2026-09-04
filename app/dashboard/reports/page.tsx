@@ -49,14 +49,30 @@ function respLabel(sec: number) {
   return `${Math.round(sec / 60)}m`;
 }
 
-const chartTooltip = {
-  contentStyle: {
-    background: "hsl(var(--popover))",
-    border: "1px solid hsl(var(--border))",
-    borderRadius: 8,
-    fontSize: 12,
-  },
-};
+const AXIS_TICK = { fill: "#94a3b8", fontSize: 11.5 };
+const CHART_MARGIN = { top: 12, right: 16, left: 4, bottom: 8 };
+
+interface ChartTooltipProps {
+  active?: boolean;
+  payload?: { name?: string; value?: number | string }[];
+  label?: string;
+  unit?: string;
+}
+
+/** Glassmorphic tooltip shared by every chart on this page -- shows the exact label and value(s) on hover. */
+function ChartTooltip({ active, payload, label, unit }: ChartTooltipProps) {
+  if (!active || !payload || payload.length === 0) return null;
+  return (
+    <div className="rounded-xl border border-white/10 bg-[#0b0f12]/90 p-3 shadow-2xl backdrop-blur-xl">
+      <div className="mb-1 text-xs font-medium text-slate-100">{label}</div>
+      {payload.map((p, i) => (
+        <div key={i} className="text-xs text-slate-400">
+          {p.name ?? "Value"}: <span className="font-semibold text-slate-100">{p.value}{unit ?? ""}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function ReportsPage() {
   const { currentClientId, currentClient } = useCurrentClient();
@@ -200,66 +216,86 @@ export default function ReportsPage() {
       )}
 
       <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card className="glow-hover p-5">
-          <div className="mb-4 text-sm font-semibold text-foreground">Leads by job type</div>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={byCategory}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="category" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10.5 }} interval={0} angle={-15} textAnchor="end" height={50} />
-              <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} allowDecimals={false} />
-              <Tooltip {...chartTooltip} cursor={{ fill: "hsl(var(--muted))" }} />
-              <Bar dataKey="count" radius={[6, 6, 0, 0]}>
-                {byCategory.map((c, i) => (
-                  <Cell key={c.category} fill={barColor(i)} />
+        <Card className="glow-hover p-6">
+          <div className="mb-4 text-sm font-semibold text-slate-100">Leads by job type</div>
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={byCategory} margin={CHART_MARGIN}>
+              <defs>
+                <linearGradient id="categoryBarGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="rgb(16,185,129)" stopOpacity={0.85} />
+                  <stop offset="100%" stopColor="rgb(16,185,129)" stopOpacity={0.25} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+              <XAxis dataKey="category" tick={AXIS_TICK} interval={0} height={34} tickLine={false} axisLine={{ stroke: "hsl(var(--border))" }} />
+              <YAxis tick={AXIS_TICK} allowDecimals={false} tickLine={false} axisLine={false} width={28} />
+              <Tooltip content={<ChartTooltip />} cursor={{ fill: "hsl(var(--muted))", opacity: 0.4 }} />
+              <Bar dataKey="count" name="Enquiries" radius={[8, 8, 0, 0]} maxBarSize={56}>
+                {byCategory.map((c) => (
+                  <Cell key={c.category} fill="url(#categoryBarGradient)" stroke="rgba(16,185,129,0.5)" strokeWidth={1} />
                 ))}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
         </Card>
 
-        <Card className="glow-hover p-5">
-          <div className="mb-4 text-sm font-semibold text-foreground">Bookings by team member</div>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={byStaff}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="staff" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
-              <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} allowDecimals={false} />
-              <Tooltip {...chartTooltip} cursor={{ fill: "hsl(var(--muted))" }} />
-              <Bar dataKey="count" fill="rgb(var(--primary-rgb, 16, 185, 129))" radius={[6, 6, 0, 0]} />
+        <Card className="glow-hover p-6">
+          <div className="mb-4 text-sm font-semibold text-slate-100">Bookings by team member</div>
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={byStaff} margin={CHART_MARGIN}>
+              <defs>
+                <linearGradient id="staffBarGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="rgb(16,185,129)" stopOpacity={0.85} />
+                  <stop offset="100%" stopColor="rgb(16,185,129)" stopOpacity={0.25} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+              <XAxis dataKey="staff" tick={AXIS_TICK} height={34} tickLine={false} axisLine={{ stroke: "hsl(var(--border))" }} />
+              <YAxis tick={AXIS_TICK} allowDecimals={false} tickLine={false} axisLine={false} width={28} />
+              <Tooltip content={<ChartTooltip />} cursor={{ fill: "hsl(var(--muted))", opacity: 0.4 }} />
+              <Bar dataKey="count" name="Bookings" fill="url(#staffBarGradient)" stroke="rgba(16,185,129,0.5)" strokeWidth={1} radius={[8, 8, 0, 0]} maxBarSize={56} />
             </BarChart>
           </ResponsiveContainer>
         </Card>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card className="glow-hover p-5">
-          <div className="mb-4 text-sm font-semibold text-foreground">When enquiries actually come in</div>
-          <ResponsiveContainer width="100%" height={180}>
-            <BarChart data={hourData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="hour" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
-              <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} allowDecimals={false} />
-              <Tooltip {...chartTooltip} cursor={{ fill: "hsl(var(--muted))" }} />
-              <Bar dataKey="count" fill="rgba(var(--color-ai), 0.8)" radius={[6, 6, 0, 0]} />
+        <Card className="glow-hover p-6">
+          <div className="mb-4 text-sm font-semibold text-slate-100">When enquiries actually come in</div>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={hourData} margin={CHART_MARGIN}>
+              <defs>
+                <linearGradient id="hourBarGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="rgb(139,92,246)" stopOpacity={0.85} />
+                  <stop offset="100%" stopColor="rgb(139,92,246)" stopOpacity={0.25} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+              <XAxis dataKey="hour" tick={AXIS_TICK} height={34} tickLine={false} axisLine={{ stroke: "hsl(var(--border))" }} />
+              <YAxis tick={AXIS_TICK} allowDecimals={false} tickLine={false} axisLine={false} width={28} />
+              <Tooltip content={<ChartTooltip />} cursor={{ fill: "hsl(var(--muted))", opacity: 0.4 }} />
+              <Bar dataKey="count" name="Enquiries" fill="url(#hourBarGradient)" stroke="rgba(139,92,246,0.5)" strokeWidth={1} radius={[8, 8, 0, 0]} maxBarSize={40} />
             </BarChart>
           </ResponsiveContainer>
         </Card>
 
-        <Card className="glow-hover p-5">
-          <div className="mb-1 text-sm font-semibold text-foreground">Response time trend</div>
+        <Card className="glow-hover p-6">
+          <div className="mb-1 text-sm font-semibold text-slate-100">Response time trend</div>
           <div className="mb-3 text-xs text-muted-foreground">average seconds to first response, last 7 days</div>
-          <ResponsiveContainer width="100%" height={160}>
-            <LineChart data={respTrend}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="day" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} />
-              <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
-              <Tooltip {...chartTooltip} />
+          <ResponsiveContainer width="100%" height={200}>
+            <LineChart data={respTrend} margin={CHART_MARGIN}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+              <XAxis dataKey="day" tick={AXIS_TICK} height={28} tickLine={false} axisLine={{ stroke: "hsl(var(--border))" }} />
+              <YAxis tick={AXIS_TICK} tickLine={false} axisLine={false} width={28} />
+              <Tooltip content={<ChartTooltip unit="s" />} />
               <Line
                 type="monotone"
                 dataKey="secs"
+                name="Avg. response"
                 stroke="rgb(var(--primary-rgb, 16, 185, 129))"
                 strokeWidth={2.5}
-                dot={{ fill: "rgb(var(--primary-rgb, 16, 185, 129))", r: 3 }}
+                dot={{ fill: "rgb(var(--primary-rgb, 16, 185, 129))", r: 3.5, strokeWidth: 0 }}
+                activeDot={{ r: 5, strokeWidth: 0 }}
               />
             </LineChart>
           </ResponsiveContainer>

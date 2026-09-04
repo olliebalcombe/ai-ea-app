@@ -169,7 +169,7 @@ export default function LeadQueuePage() {
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : (
-        <div className="flex gap-4 overflow-x-auto pb-4">
+        <div className="no-scrollbar flex gap-4 overflow-x-auto pb-4">
           {STATUS_FLOW.map((status) => {
             const col = filtered.filter((l) => l.status === status);
             return (

@@ -43,10 +43,12 @@ export default function QualificationScoreCard({
   lead,
   messages,
   photoCount,
+  assistantName,
 }: {
   lead: Lead;
   messages: LeadMessage[];
   photoCount: number;
+  assistantName?: string;
 }) {
   const hasFlooringSignal = lead.buying_intent != null || lead.budget_fit != null || lead.install_timeline != null;
   if (!hasFlooringSignal) return null;
@@ -59,10 +61,28 @@ export default function QualificationScoreCard({
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-sm">
-          <Sparkles className="h-4 w-4 text-primary" /> Qualification Score
+          <Sparkles className="h-4 w-4 text-primary" /> {assistantName ? `${assistantName}'s Qualification Scorecard` : "Qualification Score"}
         </CardTitle>
       </CardHeader>
       <CardContent className="grid grid-cols-2 gap-3 text-xs">
+        {lead.room_type && (
+          <div>
+            <div className="text-muted-foreground">Room Type</div>
+            <div className="mt-0.5 font-medium text-foreground">{lead.room_type}</div>
+          </div>
+        )}
+        {lead.flooring_type && (
+          <div>
+            <div className="text-muted-foreground">Material</div>
+            <div className="mt-0.5 font-medium text-foreground">{lead.flooring_type}</div>
+          </div>
+        )}
+        {lead.area_sqm != null && (
+          <div>
+            <div className="text-muted-foreground">Area</div>
+            <div className="mt-0.5 font-medium text-foreground">{lead.area_sqm} sq/m</div>
+          </div>
+        )}
         {lead.buying_intent && (
           <div>
             <div className="text-muted-foreground">Buying Intent</div>

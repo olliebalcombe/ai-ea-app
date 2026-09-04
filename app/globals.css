@@ -197,6 +197,15 @@
   border-radius: 3px;
 }
 
+/* Fully hidden scrollbar for panels where any scrollbar chrome would look cheap -- distinct from .thin-scroll, which keeps a deliberate slim visible one. */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 @keyframes ticker-scroll {
   from {
     transform: translateX(0);

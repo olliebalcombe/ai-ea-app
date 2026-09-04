@@ -68,7 +68,7 @@ function ConversationList({
         variants={staggerContainer}
         initial="initial"
         animate="animate"
-        className="w-80 shrink-0 overflow-y-auto border-r border-border p-2"
+        className="no-scrollbar w-80 shrink-0 overflow-y-auto border-r border-border p-2"
       >
         {leads.length === 0 && <p className="p-4 text-sm text-muted-foreground">No conversations here.</p>}
         {leads.map((l) => {

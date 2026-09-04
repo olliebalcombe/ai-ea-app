@@ -32,6 +32,7 @@ import {
   LogOut,
   Check,
   Zap,
+  Radio,
   FlaskConical,
   type LucideIcon,
 } from "lucide-react";
@@ -54,6 +55,7 @@ import {
 import CommandPalette from "@/components/CommandPalette";
 import HealthAuditButton from "@/components/HealthAuditButton";
 import SimulateLeadDrawer from "@/components/SimulateLeadDrawer";
+import BroadcastDialog from "@/components/BroadcastDialog";
 import LiveActivityTicker from "@/components/LiveActivityTicker";
 
 interface NavItem {
@@ -65,6 +67,8 @@ interface NavItem {
 interface NavGroup {
   label: string;
   icon: LucideIcon;
+  /** Where clicking the category label itself (not a specific item) navigates. */
+  href: string;
   /** The named core workspaces for this category -- shown first, full-weight. */
   primary: NavItem[];
   /** Everything else that still lives in this category -- shown under a "More" header. */
@@ -75,6 +79,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: "Inbox",
     icon: Inbox,
+    href: "/dashboard/inbox",
     primary: [
       { href: "/dashboard", label: "Today", icon: Home },
       { href: "/dashboard/inbox", label: "Inbox", icon: Inbox },
@@ -88,6 +93,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: "Schedule",
     icon: Calendar,
+    href: "/dashboard/calendar",
     primary: [
       { href: "/dashboard/follow-ups", label: "Follow-ups", icon: Clock },
       { href: "/dashboard/calendar", label: "Calendar & Site Visits", icon: Calendar },
@@ -98,6 +104,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: "AI Assistant",
     icon: Sparkles,
+    href: "/dashboard/business-memory",
     primary: [
       { href: "/dashboard/business-memory", label: "Business Memory", icon: BookOpen },
       { href: "/dashboard/playbooks", label: "Playbooks", icon: Workflow },
@@ -111,6 +118,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: "Settings",
     icon: SettingsIcon,
+    href: "/dashboard/settings/ai",
     primary: [
       { href: "/dashboard/customers", label: "Customers", icon: Users },
       { href: "/dashboard/settings/integrations", label: "Integrations & Settings", icon: SettingsIcon },
@@ -145,6 +153,7 @@ export default function TopNav() {
   const [openGroup, setOpenGroup] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [simulateOpen, setSimulateOpen] = useState(false);
+  const [broadcastOpen, setBroadcastOpen] = useState(false);
 
   function isActive(href: string) {
     return pathname === href || pathname?.startsWith(href + "/");
@@ -176,7 +185,8 @@ export default function TopNav() {
                 onMouseEnter={() => setOpenGroup(group.label)}
                 onMouseLeave={() => setOpenGroup(null)}
               >
-                <button
+                <Link
+                  href={group.href}
                   className={cn(
                     "relative flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors",
                     isGroupActive(group) ? "text-primary" : "text-muted-foreground hover:text-foreground"
@@ -190,7 +200,7 @@ export default function TopNav() {
                     />
                   )}
                   <GroupIcon className="relative h-3.5 w-3.5" /> <span className="relative">{group.label}</span>
-                </button>
+                </Link>
                 <AnimatePresence>
                   {openGroup === group.label && (
                     <motion.div
@@ -267,6 +277,9 @@ export default function TopNav() {
             <Zap className="h-4 w-4" />
             Simulate Lead
           </Button>
+          <Button onClick={() => setBroadcastOpen(true)} size="icon" variant="outline" title="Broadcast Update">
+            <Radio className="h-4 w-4" />
+          </Button>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -304,6 +317,7 @@ export default function TopNav() {
         </button>
 
         <SimulateLeadDrawer open={simulateOpen} onOpenChange={setSimulateOpen} />
+        <BroadcastDialog open={broadcastOpen} onOpenChange={setBroadcastOpen} />
       </header>
       <LiveActivityTicker />
 

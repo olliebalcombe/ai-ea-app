@@ -653,7 +653,7 @@ export default function LeadDetailContent({
             </CardContent>
           </Card>
 
-          <QualificationScoreCard lead={lead} messages={messages} photoCount={media.length} />
+          <QualificationScoreCard lead={lead} messages={messages} photoCount={media.length} assistantName={assistantName} />
 
           <Card>
             <CardHeader>

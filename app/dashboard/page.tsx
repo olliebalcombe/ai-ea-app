@@ -16,23 +16,31 @@ import {
   Star,
   Globe,
   PhoneCall,
-  Zap,
-  Radio,
+  Phone,
+  Mail,
   type LucideIcon,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { supabaseBrowser } from "@/lib/supabaseClient";
 import { useCurrentClient } from "@/lib/clientContext";
-import { staggerContainer, staggerItem } from "@/lib/motion";
+import { staggerContainer, staggerItem, hoverShift } from "@/lib/motion";
 import ApprovalQueueCard from "@/components/ApprovalQueueCard";
 import LeakageCard from "@/components/LeakageCard";
 import InteractiveChart from "@/components/InteractiveChart";
 import TodaySchedule, { type ScheduleItem } from "@/components/TodaySchedule";
-import SimulateLeadDrawer from "@/components/SimulateLeadDrawer";
-import BroadcastDialog from "@/components/BroadcastDialog";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import type { Lead, ActivityLogEntry, ActivityType, LeadSuggestion } from "@/types";
+import type { Lead, ActivityLogEntry, ActivityType, LeadSuggestion, Channel } from "@/types";
+
+const CHANNEL_ICON: Record<Channel, LucideIcon> = { call: Phone, sms: MessageSquare, email: Mail };
+
+interface ActiveConversation {
+  leadId: string;
+  name: string;
+  channel: Channel;
+  lastMessage: string;
+  lastAt: string;
+}
 
 const STATUS_FLOW = ["New", "Contacted", "Qualified", "Booked", "Won"] as const;
 const STATUS_COLOR_VAR: Record<string, string> = {
@@ -103,12 +111,9 @@ export default function DashboardOverviewPage() {
   const [suggestions, setSuggestions] = useState<(LeadSuggestion & { leads: { name: string | null } | null })[]>([]);
   const [handledLeadIds, setHandledLeadIds] = useState<Set<string>>(new Set());
   const [scheduleItems, setScheduleItems] = useState<ScheduleItem[]>([]);
+  const [activeConversations, setActiveConversations] = useState<ActiveConversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [whiteLabel, setWhiteLabel] = useState(false);
-  const [simulateOpen, setSimulateOpen] = useState(false);
-  const [broadcastOpen, setBroadcastOpen] = useState(false);
-  const [testCalling, setTestCalling] = useState(false);
-  const [testCallResult, setTestCallResult] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!currentClientId) return;
@@ -117,7 +122,7 @@ export default function DashboardOverviewPage() {
     const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const todayStr = new Date().toISOString().slice(0, 10);
 
-    const [leadsRes, activityRes, suggestionsRes, aiMsgsRes, todayLeadsRes, todayManualRes] = await Promise.all([
+    const [leadsRes, activityRes, suggestionsRes, aiMsgsRes, todayLeadsRes, todayManualRes, recentMsgsRes] = await Promise.all([
       supabaseBrowser.from("leads").select("*").eq("client_id", currentClientId).order("created_at", { ascending: false }),
       supabaseBrowser
         .from("activity_log")
@@ -149,6 +154,13 @@ export default function DashboardOverviewPage() {
         .select("id, customer_name, booking_date, booking_time, services:service_id(name)")
         .eq("client_id", currentClientId)
         .eq("booking_date", todayStr),
+      supabaseBrowser
+        .from("lead_messages")
+        .select("lead_id, body, created_at, leads!inner(id, name, channel, status, client_id)")
+        .eq("leads.client_id", currentClientId)
+        .not("leads.status", "in", "(Won,Lost)")
+        .order("created_at", { ascending: false })
+        .limit(50),
     ]);
 
     setLeads((leadsRes.data as Lead[]) ?? []);
@@ -182,6 +194,25 @@ export default function DashboardOverviewPage() {
         postcode: null,
       })),
     ]);
+
+    const recentMsgs = (recentMsgsRes.data as unknown as
+      | { lead_id: string; body: string; created_at: string; leads: { id: string; name: string | null; channel: Channel; status: string } | null }[]
+      | null) ?? [];
+    const seenLeadIds = new Set<string>();
+    const conversations: ActiveConversation[] = [];
+    for (const m of recentMsgs) {
+      if (!m.leads || seenLeadIds.has(m.lead_id)) continue;
+      seenLeadIds.add(m.lead_id);
+      conversations.push({
+        leadId: m.lead_id,
+        name: m.leads.name ?? "Unknown",
+        channel: m.leads.channel,
+        lastMessage: m.body,
+        lastAt: m.created_at,
+      });
+      if (conversations.length >= 4) break;
+    }
+    setActiveConversations(conversations);
     setLoading(false);
   }, [currentClientId]);
 
@@ -196,26 +227,6 @@ export default function DashboardOverviewPage() {
       .finally(() => load());
   }, [currentClientId, load]);
 
-  async function testVoiceCall() {
-    if (!currentClientId) return;
-    setTestCalling(true);
-    setTestCallResult(null);
-    try {
-      const res = await fetch("/api/voice/test-call", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ client_id: currentClientId }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Call failed");
-      setTestCallResult(`Calling ${data.calledNumber} now…`);
-    } catch (e) {
-      setTestCallResult(e instanceof Error ? e.message : "Call failed");
-    } finally {
-      setTestCalling(false);
-    }
-  }
-
   if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>;
 
   const since24h = Date.now() - 24 * 60 * 60 * 1000;
@@ -226,9 +237,13 @@ export default function DashboardOverviewPage() {
   const remindersToday = activity24h.filter((a) => a.type === "reminder_sent").length;
 
   const timeSavedMins = conversationsHandled * ASSUMED_MINUTES_PER_CONVERSATION;
-  const influencedPipeline = leads
-    .filter((l) => handledLeadIds.has(l.id) && ["Qualified", "Booked", "Won"].includes(l.status))
+  const isTestLead = (l: Lead) => l.name?.startsWith("Test Lead — ") ?? false;
+  // Real open pipeline: priced, still-active quotes (Qualified/Booked, not yet Won or Lost) --
+  // not gated to the last 24h of AI activity, which read £0 against anything older.
+  const pipelineProtected = leads
+    .filter((l) => !isTestLead(l) && l.price_pence != null && ["Qualified", "Booked"].includes(l.status))
     .reduce((sum, l) => sum + (l.price_pence ?? 0), 0);
+  const realSuggestions = suggestions.filter((s) => !s.leads?.name?.startsWith("Test Lead — "));
 
   const wonCount = leads.filter((l) => l.status === "Won").length;
   const bookedCount = leads.filter((l) => l.status === "Booked").length;
@@ -243,14 +258,14 @@ export default function DashboardOverviewPage() {
         <h1 className="font-serifDisplay text-2xl font-normal tracking-tight text-foreground">Good morning, {displayName}.</h1>
         <div className="flex flex-wrap items-center gap-4 text-sm">
           <span>
-            <strong className="text-foreground">{suggestions.length}</strong> <span className="text-muted-foreground">actions pending</span>
+            <strong className="text-foreground">{realSuggestions.length}</strong> <span className="text-muted-foreground">actions pending</span>
           </span>
           <span>
             <strong className="text-foreground">{scheduleItems.length}</strong> <span className="text-muted-foreground">site visits today</span>
           </span>
           <span className="flex items-center gap-1">
             <PoundSterling className="h-3.5 w-3.5 text-primary" />
-            <strong className="text-foreground">{fmtGBP(influencedPipeline)}</strong>
+            <strong className="text-foreground">{fmtGBP(pipelineProtected)}</strong>
             <span className="text-muted-foreground">pipeline protected</span>
           </span>
         </div>
@@ -285,9 +300,33 @@ export default function DashboardOverviewPage() {
 
           <Card className="p-5">
             <div className="mb-3 text-sm font-semibold text-foreground">Today's Schedule &amp; Site Visits</div>
-            <div className="thin-scroll max-h-[400px] overflow-y-auto pr-1">
-              <TodaySchedule items={scheduleItems} />
-            </div>
+            <TodaySchedule items={scheduleItems} />
+          </Card>
+
+          <Card className="p-5">
+            <div className="mb-3 text-sm font-semibold text-foreground">Active Conversations</div>
+            {activeConversations.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No open conversations right now.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {activeConversations.map((c) => {
+                  const Icon = CHANNEL_ICON[c.channel];
+                  return (
+                    <motion.button
+                      key={c.leadId}
+                      whileHover={hoverShift}
+                      onClick={() => router.push("/dashboard/inbox")}
+                      className="glow-hover flex w-full items-center gap-2.5 rounded-lg border border-white/5 bg-white/[0.02] px-2.5 py-2 text-left"
+                    >
+                      <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      <span className="shrink-0 text-xs font-medium text-foreground">{c.name}</span>
+                      <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{c.lastMessage}</span>
+                      <span className="shrink-0 text-[10px] text-muted-foreground">{timeAgo(c.lastAt)}</span>
+                    </motion.button>
+                  );
+                })}
+              </div>
+            )}
           </Card>
 
           <Card className="p-5">
@@ -335,22 +374,6 @@ export default function DashboardOverviewPage() {
           </Card>
 
           <LeakageCard suggestions={suggestions} />
-
-          <Card className="p-5">
-            <div className="mb-3 text-sm font-semibold text-foreground">Quick Actions</div>
-            <div className="space-y-2">
-              <Button variant="outline" className="w-full justify-start" onClick={() => setSimulateOpen(true)}>
-                <Zap className="h-4 w-4" /> Simulate Lead
-              </Button>
-              <Button variant="outline" className="w-full justify-start" onClick={testVoiceCall} disabled={testCalling}>
-                <PhoneCall className="h-4 w-4" /> {testCalling ? "Calling…" : "Test AI Voice Call"}
-              </Button>
-              {testCallResult && <p className="pl-1 text-xs text-muted-foreground">{testCallResult}</p>}
-              <Button variant="outline" className="w-full justify-start" onClick={() => setBroadcastOpen(true)}>
-                <Radio className="h-4 w-4" /> Broadcast Update
-              </Button>
-            </div>
-          </Card>
         </div>
       </motion.div>
 
@@ -380,9 +403,6 @@ export default function DashboardOverviewPage() {
           </Card>
         </motion.div>
       )}
-
-      <SimulateLeadDrawer open={simulateOpen} onOpenChange={setSimulateOpen} />
-      <BroadcastDialog open={broadcastOpen} onOpenChange={setBroadcastOpen} />
     </motion.div>
   );
 }
