@@ -9,16 +9,18 @@ import PageTransition from "@/components/PageTransition";
 import { Toaster } from "@/components/ui/sonner";
 
 /**
- * DISABLE_AUTH_FOR_DEMO -- an opt-in, off-by-default escape hatch for viewing
- * the dashboard without signing in. It never overrides a real session: it
- * only kicks in when there is NO logged-in user, and only if the env var is
+ * NEXT_PUBLIC_DISABLE_AUTH_FOR_DEMO -- an opt-in, off-by-default escape hatch
+ * for viewing the dashboard without signing in. NEXT_PUBLIC_-prefixed so
+ * client components can read it too (e.g. to show a "Demo Mode" indicator),
+ * not just this server layout. It never overrides a real session: it only
+ * kicks in when there is NO logged-in user, and only if the env var is
  * explicitly set. When active, it shows one real client's data (DEMO_CLIENT_ID
  * if set, otherwise the first client row) to anyone who loads this route --
  * that is a genuine, deliberate exposure of real business data with no
  * authentication, so this must stay off in any environment where that isn't
  * an explicit, informed choice.
  */
-const DEMO_BYPASS = process.env.DISABLE_AUTH_FOR_DEMO === "true";
+const DEMO_BYPASS = process.env.NEXT_PUBLIC_DISABLE_AUTH_FOR_DEMO === "true";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = createSupabaseServerClient();
