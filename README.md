@@ -62,8 +62,6 @@ Security.
 
 ## What's still not built — honestly
 
-- The dashboard UI itself wired to real data (the React prototypes are a very
-  close spec to port across)
 - WhatsApp and push notification delivery (stubbed, not connected)
 - A scheduled job actually calling `/api/notifications/send` for the daily
   digest (needs a cron trigger — Vercel Cron or similar)
