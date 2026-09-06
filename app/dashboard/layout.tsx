@@ -36,15 +36,32 @@ export default async function DashboardLayout({ children }: { children: React.Re
     memberships = (data ?? []) as unknown as ClientMembership[];
     userEmail = user.email ?? "";
   } else if (DEMO_BYPASS) {
+    console.log("[demo-bypass] no session; DEMO_BYPASS is on, looking up demo client", {
+      demoClientId: process.env.DEMO_CLIENT_ID || "(unset -- using first client row)",
+    });
     const demoClientId = process.env.DEMO_CLIENT_ID;
     const query = supabaseAdmin.from("clients").select("*");
-    const { data: demoClient } = demoClientId
+    const { data: demoClient, error: demoClientError } = demoClientId
       ? await query.eq("id", demoClientId).single()
       : await query.order("created_at", { ascending: true }).limit(1).single();
-    if (demoClient) {
+    if (demoClientError) {
+      console.error("[demo-bypass] clients lookup failed -- falling through to /login", {
+        message: demoClientError.message,
+        code: demoClientError.code,
+        details: demoClientError.details,
+        hint: demoClientError.hint,
+      });
+    } else if (!demoClient) {
+      console.error("[demo-bypass] clients lookup returned no row -- falling through to /login");
+    } else {
+      console.log("[demo-bypass] found demo client, bypassing login", { clientId: demoClient.id, clientName: demoClient.name });
       memberships = [{ role: "owner", clients: demoClient }] as unknown as ClientMembership[];
       userEmail = "demo@local";
     }
+  } else {
+    console.log("[demo-bypass] no session and DEMO_BYPASS is off -- redirecting to /login", {
+      rawEnvValue: process.env.NEXT_PUBLIC_DISABLE_AUTH_FOR_DEMO,
+    });
   }
 
   if (!user && memberships.length === 0) redirect("/login");
