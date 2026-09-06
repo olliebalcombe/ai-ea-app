@@ -14,11 +14,12 @@ import { Toaster } from "@/components/ui/sonner";
  * client components can read it too (e.g. to show a "Demo Mode" indicator),
  * not just this server layout. It never overrides a real session: it only
  * kicks in when there is NO logged-in user, and only if the env var is
- * explicitly set. When active, it shows one real client's data (DEMO_CLIENT_ID
- * if set, otherwise 'Bracewell Flooring') to anyone who loads this route --
- * that is a genuine, deliberate exposure of real business data with no
- * authentication, so this must stay off in any environment where that isn't
- * an explicit, informed choice.
+ * explicitly set. When active, a real (but single-purpose, narrowly-scoped)
+ * demo Auth session is minted via /api/demo-session for one real client
+ * (DEMO_CLIENT_ID if set, otherwise 'Bracewell Flooring') -- a genuine,
+ * deliberate exposure of that client's real data with no authentication, so
+ * this must stay off in any environment where that isn't an explicit,
+ * informed choice.
  */
 const DEMO_BYPASS = process.env.NEXT_PUBLIC_DISABLE_AUTH_FOR_DEMO === "true";
 
@@ -28,43 +29,16 @@ export default async function DashboardLayout({ children }: { children: React.Re
     data: { user },
   } = await supabase.auth.getUser();
 
-  let memberships: ClientMembership[] = [];
-  let userEmail = "";
-
-  if (user) {
-    const { data } = await supabaseAdmin.from("client_users").select("role, clients(*)").eq("user_id", user.id);
-    memberships = (data ?? []) as unknown as ClientMembership[];
-    userEmail = user.email ?? "";
-  } else if (DEMO_BYPASS) {
-    console.log("[demo-bypass] no session; DEMO_BYPASS is on, looking up demo client", {
-      demoClientId: process.env.DEMO_CLIENT_ID || "(unset -- defaulting to 'Bracewell Flooring')",
-    });
-    const demoClientId = process.env.DEMO_CLIENT_ID;
-    const query = supabaseAdmin.from("clients").select("*");
-    const { data: demoClient, error: demoClientError } = demoClientId
-      ? await query.eq("id", demoClientId).single()
-      : await query.eq("name", "Bracewell Flooring").single();
-    if (demoClientError) {
-      console.error("[demo-bypass] clients lookup failed -- falling through to /login", {
-        message: demoClientError.message,
-        code: demoClientError.code,
-        details: demoClientError.details,
-        hint: demoClientError.hint,
-      });
-    } else if (!demoClient) {
-      console.error("[demo-bypass] clients lookup returned no row -- falling through to /login");
-    } else {
-      console.log("[demo-bypass] found demo client, bypassing login", { clientId: demoClient.id, clientName: demoClient.name });
-      memberships = [{ role: "owner", clients: demoClient }] as unknown as ClientMembership[];
-      userEmail = "demo@local";
-    }
-  } else {
-    console.log("[demo-bypass] no session and DEMO_BYPASS is off -- redirecting to /login", {
-      rawEnvValue: process.env.NEXT_PUBLIC_DISABLE_AUTH_FOR_DEMO,
-    });
+  if (!user) {
+    if (DEMO_BYPASS) redirect("/api/demo-session");
+    redirect("/login");
   }
 
-  if (!user && memberships.length === 0) redirect("/login");
+  const { data } = await supabaseAdmin.from("client_users").select("role, clients(*)").eq("user_id", user.id);
+  const memberships = (data ?? []) as unknown as ClientMembership[];
+  const userEmail = user.email ?? "";
+
+  if (memberships.length === 0) redirect("/login");
 
   return (
     <ClientProvider memberships={memberships} userEmail={userEmail}>
