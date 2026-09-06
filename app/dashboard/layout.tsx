@@ -15,7 +15,7 @@ import { Toaster } from "@/components/ui/sonner";
  * not just this server layout. It never overrides a real session: it only
  * kicks in when there is NO logged-in user, and only if the env var is
  * explicitly set. When active, it shows one real client's data (DEMO_CLIENT_ID
- * if set, otherwise the first client row) to anyone who loads this route --
+ * if set, otherwise 'Bracewell Flooring') to anyone who loads this route --
  * that is a genuine, deliberate exposure of real business data with no
  * authentication, so this must stay off in any environment where that isn't
  * an explicit, informed choice.
@@ -37,13 +37,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
     userEmail = user.email ?? "";
   } else if (DEMO_BYPASS) {
     console.log("[demo-bypass] no session; DEMO_BYPASS is on, looking up demo client", {
-      demoClientId: process.env.DEMO_CLIENT_ID || "(unset -- using first client row)",
+      demoClientId: process.env.DEMO_CLIENT_ID || "(unset -- defaulting to 'Bracewell Flooring')",
     });
     const demoClientId = process.env.DEMO_CLIENT_ID;
     const query = supabaseAdmin.from("clients").select("*");
     const { data: demoClient, error: demoClientError } = demoClientId
       ? await query.eq("id", demoClientId).single()
-      : await query.order("created_at", { ascending: true }).limit(1).single();
+      : await query.eq("name", "Bracewell Flooring").single();
     if (demoClientError) {
       console.error("[demo-bypass] clients lookup failed -- falling through to /login", {
         message: demoClientError.message,
