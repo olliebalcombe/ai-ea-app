@@ -1,3 +1,4 @@
+import { createHash } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { supabaseAdmin } from "@/lib/supabase";
@@ -10,7 +11,18 @@ import { supabaseAdmin } from "@/lib/supabase";
  * instead of the layout merely faking React context (which RLS ignores).
  * The demo account is provisioned on first use and reused after that --
  * it is never given access to more than the one demo client.
+ *
+ * Uses a deterministic password + signInWithPassword rather than
+ * generateLink()/verifyOtp() -- the magic-link token exchange proved
+ * unreliable on Vercel ("Email link is invalid or expired"), and a direct
+ * password sign-in has no link/token expiry to race against. The password
+ * is never sent to the browser or logged -- it's derived from the service
+ * role key so it never needs to be stored anywhere new.
  */
+function demoPasswordFor(email: string) {
+  return createHash("sha256").update(`${email}:${process.env.SUPABASE_SERVICE_ROLE_KEY}`).digest("hex");
+}
+
 export async function GET(req: NextRequest) {
   if (process.env.NEXT_PUBLIC_DISABLE_AUTH_FOR_DEMO !== "true") {
     return NextResponse.redirect(new URL("/login", req.url));
@@ -29,14 +41,16 @@ export async function GET(req: NextRequest) {
 
   // Deterministic per-client so repeat visits reuse the same account rather than creating a new one each time.
   const demoEmail = `demo-${demoClient.id}@internal.demo`;
+  const demoPassword = demoPasswordFor(demoEmail);
 
-  let demoUserId: string;
   const { data: created, error: createError } = await supabaseAdmin.auth.admin.createUser({
     email: demoEmail,
+    password: demoPassword,
     email_confirm: true,
     user_metadata: { demo_account: true },
   });
 
+  let demoUserId: string;
   if (created?.user) {
     demoUserId = created.user.id;
     const { error: linkError } = await supabaseAdmin
@@ -58,17 +72,6 @@ export async function GET(req: NextRequest) {
     demoUserId = existing.id;
   }
 
-  // Mint a real magic-link token for that user, then exchange it server-side for a real session --
-  // the visitor never sees an email or a link, this happens entirely in the request.
-  const { data: linkData, error: linkGenError } = await supabaseAdmin.auth.admin.generateLink({
-    type: "magiclink",
-    email: demoEmail,
-  });
-  if (linkGenError || !linkData) {
-    console.error("[demo-session] failed to generate session link", linkGenError);
-    return NextResponse.redirect(new URL("/login", req.url));
-  }
-
   const response = NextResponse.redirect(new URL("/dashboard", req.url));
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -83,12 +86,23 @@ export async function GET(req: NextRequest) {
     }
   );
 
-  const { error: verifyError } = await supabase.auth.verifyOtp({
-    token_hash: linkData.properties.hashed_token,
-    type: "email",
-  });
-  if (verifyError) {
-    console.error("[demo-session] failed to exchange session token", verifyError);
+  let { error: signInError } = await supabase.auth.signInWithPassword({ email: demoEmail, password: demoPassword });
+
+  if (signInError) {
+    // The account may predate this password scheme (e.g. created by an earlier
+    // magic-link version of this route with no password at all) -- reset it to
+    // the known deterministic password and retry once before giving up.
+    console.warn("[demo-session] initial sign-in failed, resetting demo account password and retrying", signInError.message);
+    const { error: resetError } = await supabaseAdmin.auth.admin.updateUserById(demoUserId, { password: demoPassword });
+    if (resetError) {
+      console.error("[demo-session] failed to reset demo account password", resetError);
+      return NextResponse.redirect(new URL("/login", req.url));
+    }
+    ({ error: signInError } = await supabase.auth.signInWithPassword({ email: demoEmail, password: demoPassword }));
+  }
+
+  if (signInError) {
+    console.error("[demo-session] sign-in failed even after password reset", signInError);
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
