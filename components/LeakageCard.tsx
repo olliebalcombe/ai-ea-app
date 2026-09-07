@@ -16,12 +16,12 @@ export default function LeakageCard({ suggestions }: { suggestions: (LeadSuggest
 
   return (
     <Card
-      className="mb-6 p-5"
+      className="p-5"
       style={{ borderColor: "rgba(var(--color-risk), 0.25)", background: "rgba(var(--color-risk), 0.05)" }}
     >
       <div className="mb-3 flex items-center gap-2">
-        <AlertTriangle className="h-4 w-4" style={{ color: "rgb(var(--color-risk))" }} />
-        <div className="text-sm font-semibold text-foreground">At risk</div>
+        <AlertTriangle className="h-4 w-4" style={{ color: "rgb(var(--color-risk))" }} aria-hidden="true" />
+        <h2 className="text-sm font-semibold text-foreground">At risk</h2>
       </div>
       <div className="mb-3 space-y-1.5">
         {Array.from(byType.entries()).map(([type, count]) => {
@@ -29,8 +29,8 @@ export default function LeakageCard({ suggestions }: { suggestions: (LeadSuggest
           const Icon = meta.icon;
           return (
             <div key={type} className="flex items-center gap-2 text-sm text-foreground">
-              <Icon className="h-3.5 w-3.5 text-muted-foreground" />
-              <strong>{count}</strong> {meta.label.toLowerCase()}
+              <Icon className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+              <strong className="tabular-nums">{count}</strong> {meta.label.toLowerCase()}
             </div>
           );
         })}

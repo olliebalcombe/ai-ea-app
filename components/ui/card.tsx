@@ -9,11 +9,12 @@ const Card = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "rounded-xl bg-white/[0.03] text-card-foreground shadow-2xl ring-1 ring-white/[0.03]",
+      "rounded-xl text-card-foreground shadow-2xl ring-1 ring-white/[0.03]",
       className
     )}
     style={{
-      border: "1px solid rgba(255,255,255,var(--border-opacity, 0.1))",
+      backgroundColor: "rgba(13, 24, 23, 0.78)",
+      border: "1px solid rgba(180,255,220,var(--border-opacity, 0.1))",
       backdropFilter: "blur(var(--card-blur, 12px))",
       WebkitBackdropFilter: "blur(var(--card-blur, 12px))",
       ...style,

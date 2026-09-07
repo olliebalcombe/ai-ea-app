@@ -1,9 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { TrendingUp, TrendingDown } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { TrendingUp, TrendingDown, LineChart as LineChartIcon } from "lucide-react";
+import SegmentedControl from "@/components/SegmentedControl";
+import ChartTooltip from "@/components/ChartTooltip";
+import EmptyState from "@/components/EmptyState";
+import { AXIS_TICK, CHART_MARGIN } from "@/lib/chartTheme";
 import type { Lead } from "@/types";
 
 type Metric = "Enquiries" | "Bookings" | "Revenue" | "Conversion Rate";
@@ -74,74 +77,71 @@ export default function InteractiveChart({ leads }: { leads: Lead[] }) {
     return { data: series, changePct: pct };
   }, [leads, metric, period]);
 
-  const formatValue = (v: number) =>
-    metric === "Revenue" ? `£${v.toLocaleString("en-GB")}` : metric === "Conversion Rate" ? `${v}%` : `${v}`;
+  const formatValue = (v: number | string) => {
+    const n = typeof v === "string" ? parseFloat(v) : v;
+    return metric === "Revenue" ? `£${n.toLocaleString("en-GB")}` : metric === "Conversion Rate" ? `${n}%` : `${n}`;
+  };
+
+  if (leads.length === 0) {
+    return (
+      <div>
+        <h2 className="mb-3 text-sm font-semibold text-foreground">Enquiry &amp; revenue trends</h2>
+        <EmptyState
+          icon={LineChartIcon}
+          title="Not enough data yet"
+          description="Once leads start coming in, this chart will track enquiries, bookings, revenue, and conversion rate over time."
+        />
+      </div>
+    );
+  }
 
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap gap-1.5">
-          {METRICS.map((m) => (
-            <button
-              key={m}
-              onClick={() => setMetric(m)}
-              className={cn(
-                "rounded-full border px-2.5 py-1 text-xs transition-colors",
-                metric === m ? "border-primary/40 bg-primary/10 text-primary" : "border-border text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {m}
-            </button>
-          ))}
-        </div>
-        <div className="flex gap-1.5">
-          {PERIODS.map((p) => (
-            <button
-              key={p}
-              onClick={() => setPeriod(p)}
-              className={cn(
-                "rounded-full border px-2.5 py-1 text-xs transition-colors",
-                period === p ? "border-primary/40 bg-primary/10 text-primary" : "border-border text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {p}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl<Metric> label="Metric" options={METRICS.map((m) => ({ value: m, label: m }))} value={metric} onChange={setMetric} />
+        <SegmentedControl<Period> label="Time range" size="sm" options={PERIODS.map((p) => ({ value: p, label: p }))} value={period} onChange={setPeriod} />
       </div>
 
       <div className="mb-3 flex items-center gap-1.5 text-sm">
         {changePct >= 0 ? (
-          <TrendingUp className="h-4 w-4 text-primary" />
+          <TrendingUp className="h-4 w-4 text-primary" aria-hidden="true" />
         ) : (
-          <TrendingDown className="h-4 w-4" style={{ color: "rgb(var(--color-risk))" }} />
+          <TrendingDown className="h-4 w-4" style={{ color: "rgb(var(--color-risk))" }} aria-hidden="true" />
         )}
         <span className="text-foreground">
-          {metric} are {changePct >= 0 ? "up" : "down"} <strong>{Math.abs(changePct)}%</strong> vs the prior period
+          {metric} are {changePct >= 0 ? "up" : "down"} <strong className="tabular-nums">{Math.abs(changePct)}%</strong> vs the prior period
         </span>
       </div>
 
-      <ResponsiveContainer width="100%" height={200}>
-        <LineChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+      <ResponsiveContainer width="100%" height={220}>
+        <AreaChart data={data} margin={CHART_MARGIN}>
+          <defs>
+            <linearGradient id="interactiveChartGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="rgb(var(--primary-rgb))" stopOpacity={0.35} />
+              <stop offset="100%" stopColor="rgb(var(--primary-rgb))" stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
           <XAxis
             dataKey="label"
-            tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10.5 }}
+            tick={AXIS_TICK}
             interval={period === "30d" ? 4 : "preserveStartEnd"}
+            tickLine={false}
+            axisLine={{ stroke: "hsl(var(--border))" }}
           />
-          <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} tickFormatter={formatValue} width={metric === "Revenue" ? 55 : 35} />
-          <Tooltip
-            formatter={(v: number) => [formatValue(v), metric]}
-            contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
-          />
-          <Line
+          <YAxis tick={AXIS_TICK} tickFormatter={formatValue} width={metric === "Revenue" ? 55 : 35} tickLine={false} axisLine={false} />
+          <Tooltip content={<ChartTooltip formatter={formatValue} />} cursor={{ stroke: "rgb(var(--primary-rgb))", strokeOpacity: 0.3 }} />
+          <Area
             type="monotone"
             dataKey="value"
-            stroke="rgb(var(--primary-rgb, 16, 185, 129))"
+            name={metric}
+            stroke="rgb(var(--primary-rgb))"
             strokeWidth={2.5}
-            dot={{ fill: "rgb(var(--primary-rgb, 16, 185, 129))", r: 3 }}
+            fill="url(#interactiveChartGradient)"
+            dot={{ fill: "rgb(var(--primary-rgb))", r: 3, strokeWidth: 0 }}
+            activeDot={{ r: 5, strokeWidth: 0 }}
           />
-        </LineChart>
+        </AreaChart>
       </ResponsiveContainer>
     </div>
   );

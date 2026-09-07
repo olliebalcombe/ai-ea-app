@@ -71,41 +71,48 @@
   }
   .dark {
 
-    --background: #0B0F12;
+    --background: #07100F;
 
-    --foreground: oklch(0.985 0 0);
+    --foreground: #E8F5F0;
 
-    --card: oklch(0.21 0.006 285.885);
+    --card: #0D1817;
 
-    --card-foreground: oklch(0.985 0 0);
+    --card-foreground: #E8F5F0;
 
-    --popover: oklch(0.21 0.006 285.885);
+    --popover: #0D1817;
 
-    --popover-foreground: oklch(0.985 0 0);
+    --popover-foreground: #E8F5F0;
 
-    --primary: #10B981;
+    --primary: #18E6A0;
 
     --primary-foreground: #04140c;
 
-    --secondary: oklch(0.274 0.006 286.033);
+    --secondary: #12201E;
 
-    --secondary-foreground: oklch(0.985 0 0);
+    --secondary-foreground: #E8F5F0;
 
-    --muted: oklch(0.274 0.006 286.033);
+    --muted: #12201E;
 
-    --muted-foreground: oklch(0.76 0.015 286.067);
+    --muted-foreground: #8FA9A0;
 
-    --accent: oklch(0.274 0.006 286.033);
+    --accent: #172824;
 
-    --accent-foreground: oklch(0.985 0 0);
+    --accent-foreground: #E8F5F0;
 
-    --destructive: oklch(0.704 0.191 22.216);
+    --destructive: #D96C5F;
 
-    --border: oklch(1 0 0 / 10%);
+    --border: rgba(180, 255, 220, 0.1);
 
-    --input: oklch(1 0 0 / 15%);
+    --input: rgba(180, 255, 220, 0.14);
 
-    --ring: #10B981;
+    --ring: #18E6A0;
+
+    /* New surface tokens -- distinct from --card (primary surface), used for
+       elevated/hovered panels. Additive only; nothing existing was renamed. */
+    --surface: #0D1817;
+    --surface-elevated: #12201E;
+    --surface-hover: #172824;
+    --accent-hover-rgb: 61, 255, 184;
 
     --chart-1: oklch(0.871 0.006 286.286);
 
@@ -138,16 +145,16 @@
     --card-blur: 12px;
     --border-opacity: 0.12;
     --font-scale: 1;
-    --bg-gradient-from: rgba(16, 185, 129, 0.06);
-    --bg-gradient-to: rgba(16, 185, 129, 0);
-    --primary-rgb: 16, 185, 129;
+    --bg-gradient-from: rgba(24, 230, 160, 0.06);
+    --bg-gradient-to: rgba(24, 230, 160, 0);
+    --primary-rgb: 24, 230, 160;
 
     /* Semantic action colors for the Morning Briefing / Approval Queue / Leakage
        UI -- distinct from StatusBadge's pipeline-stage colors, which stay as-is. */
     --color-attention: 230, 168, 74; /* #E6A84A amber -- needs a decision */
     --color-risk: 217, 108, 95; /* #D96C5F coral -- at risk, revenue leakage */
     --color-ai: 139, 92, 246; /* #8B5CF6 violet -- AI-drafted/generated */
-    --color-info: 148, 163, 184; /* slate -- informational */
+    --color-info: 91, 155, 209; /* #5B9BD1 restrained sky blue -- informational */
     --color-handled: 63, 178, 127; /* #3FB27F calmer green for "Handled" pills, distinct from --primary-rgb's brand accent */
   }
 }
@@ -169,7 +176,7 @@
 }
 
 .glow-ring {
-  box-shadow: 0 0 40px -8px rgba(var(--primary-rgb, 16, 185, 129), calc(var(--glow-intensity, 0.7) * 0.5));
+  box-shadow: 0 0 40px -8px rgba(var(--primary-rgb, 24, 230, 160), calc(var(--glow-intensity, 0.7) * 0.5));
 }
 
 .glow-hover {
@@ -177,8 +184,8 @@
 }
 
 .glow-hover:hover {
-  border-color: rgba(var(--primary-rgb, 16, 185, 129), 0.3);
-  box-shadow: 0 0 20px rgba(var(--primary-rgb, 16, 185, 129), calc(var(--glow-intensity, 0.7) * 0.17));
+  border-color: rgba(var(--primary-rgb, 24, 230, 160), 0.3);
+  box-shadow: 0 0 20px rgba(var(--primary-rgb, 24, 230, 160), calc(var(--glow-intensity, 0.7) * 0.17));
 }
 
 /* Slim, low-contrast scrollbar for clamped dashboard panels -- present but unobtrusive, not fully hidden. */

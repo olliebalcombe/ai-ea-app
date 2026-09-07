@@ -2,14 +2,16 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
-import { Sparkles, Check, X, ArrowRight } from "lucide-react";
+import { motion, useReducedMotion } from "framer-motion";
+import { Sparkles, Check, X, ArrowRight, ClipboardCheck } from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabaseClient";
 import { SUGGESTION_META } from "@/lib/suggestions";
 import { hoverShift } from "@/lib/motion";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import EmptyState from "@/components/EmptyState";
 import type { LeadSuggestion } from "@/types";
 
 type SuggestionRow = LeadSuggestion & { leads: { name: string | null } | null };
@@ -35,6 +37,7 @@ export default function ApprovalQueueCard({
   onReview?: () => void;
 }) {
   const router = useRouter();
+  const reduceMotion = useReducedMotion();
   const [drafting, setDrafting] = useState<string | null>(null);
   const [acting, setActing] = useState<string | null>(null);
   const [edits, setEdits] = useState<Record<string, string>>({});
@@ -85,54 +88,79 @@ export default function ApprovalQueueCard({
   }
 
   if (suggestions.length === 0) {
-    return <p className="text-sm text-muted-foreground">Nothing needs your decision right now.</p>;
+    return <EmptyState icon={ClipboardCheck} title="Nothing needs your decision" description="Approval requests from your assistant will appear here." />;
   }
 
   if (compact) {
     return (
-      <div className="space-y-1.5">
-        {error && <p className="text-xs text-destructive">{error}</p>}
-        {suggestions.map((s) => {
-          const meta = SUGGESTION_META[s.type];
-          const Icon = meta.icon;
-          return (
-            <motion.div
-              key={s.id}
-              whileHover={hoverShift}
-              className="glow-hover flex items-center gap-2 rounded-lg border border-white/5 bg-white/[0.02] px-2.5 py-2"
-            >
-              <span
-                className="flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-medium"
-                style={{ background: `rgba(var(${meta.colorVar}), 0.12)`, color: `rgb(var(${meta.colorVar}))` }}
+      <TooltipProvider delayDuration={300}>
+        <div className="space-y-1.5">
+          {error && <p className="text-xs text-destructive">{error}</p>}
+          {suggestions.map((s) => {
+            const meta = SUGGESTION_META[s.type];
+            const Icon = meta.icon;
+            const leadName = s.leads?.name ?? "Unknown lead";
+            return (
+              <motion.div
+                key={s.id}
+                whileHover={reduceMotion ? undefined : hoverShift}
+                className="glow-hover flex items-center gap-2 rounded-lg border border-white/5 bg-white/[0.02] px-2.5 py-2 focus-within:ring-2 focus-within:ring-ring"
               >
-                <Icon className="h-2.5 w-2.5" />
-              </span>
-              <button
-                className="min-w-0 flex-1 truncate text-left text-xs text-foreground hover:underline"
-                onClick={() => router.push(`/dashboard/leads/${s.lead_id}`)}
-                title={`${s.leads?.name ?? "Unknown lead"} — ${s.reason}`}
-              >
-                <span className="font-medium">{s.leads?.name ?? "Unknown lead"}</span>
-                <span className="text-muted-foreground"> — {s.reason}</span>
-              </button>
-              <div className="flex shrink-0 items-center gap-1">
-                {meta.hasMessage ? (
-                  <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[10px]" onClick={onReview}>
-                    Review <ArrowRight className="h-2.5 w-2.5" />
+                <span
+                  className="flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-medium"
+                  style={{ background: `rgba(var(${meta.colorVar}), 0.12)`, color: `rgb(var(${meta.colorVar}))` }}
+                >
+                  <Icon className="h-2.5 w-2.5" aria-hidden="true" />
+                </span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      className="min-w-0 flex-1 truncate text-left text-xs text-foreground hover:underline focus-visible:outline-none"
+                      onClick={() => router.push(`/dashboard/leads/${s.lead_id}`)}
+                    >
+                      <span className="font-medium">{leadName}</span>
+                      <span className="text-muted-foreground"> — {s.reason}</span>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    {leadName} — {s.reason}
+                  </TooltipContent>
+                </Tooltip>
+                <div className="flex shrink-0 items-center gap-1">
+                  {meta.hasMessage ? (
+                    <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[10px]" onClick={onReview}>
+                      Review <ArrowRight className="h-2.5 w-2.5" />
+                    </Button>
+                  ) : (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-6 w-6"
+                      onClick={() => approve(s)}
+                      disabled={acting === s.id}
+                      aria-label={`Approve: ${s.reason}`}
+                      title="Approve"
+                    >
+                      <Check className="h-3 w-3 text-primary" />
+                    </Button>
+                  )}
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-6 w-6"
+                    onClick={() => dismiss(s)}
+                    disabled={acting === s.id}
+                    aria-label={`Dismiss: ${s.reason}`}
+                    title="Dismiss"
+                  >
+                    <X className="h-3 w-3 text-muted-foreground" />
                   </Button>
-                ) : (
-                  <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => approve(s)} disabled={acting === s.id} title="Approve">
-                    <Check className="h-3 w-3 text-primary" />
-                  </Button>
-                )}
-                <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => dismiss(s)} disabled={acting === s.id} title="Dismiss">
-                  <X className="h-3 w-3 text-muted-foreground" />
-                </Button>
-              </div>
-            </motion.div>
-          );
-        })}
-      </div>
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
+      </TooltipProvider>
     );
   }
 
@@ -150,7 +178,7 @@ export default function ApprovalQueueCard({
                 className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium"
                 style={{ background: `rgba(var(${meta.colorVar}), 0.12)`, color: `rgb(var(${meta.colorVar}))` }}
               >
-                <Icon className="h-3 w-3" /> {meta.label}
+                <Icon className="h-3 w-3" aria-hidden="true" /> {meta.label}
               </span>
               <button
                 className="text-sm font-medium text-foreground hover:underline"
@@ -168,6 +196,7 @@ export default function ApprovalQueueCard({
                   onChange={(e) => setEdits((edit) => ({ ...edit, [s.id]: e.target.value }))}
                   rows={2}
                   className="mb-2 text-sm"
+                  aria-label="Draft message"
                 />
               ) : (
                 <Button size="sm" variant="outline" className="mb-2" onClick={() => draft(s)} disabled={drafting === s.id}>

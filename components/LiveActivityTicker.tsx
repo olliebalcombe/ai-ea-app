@@ -19,15 +19,18 @@ const ICON_FOR: Record<ActivityType, LucideIcon> = {
   missed_call_recovery: PhoneCall,
 };
 
-const COLOR_FOR: Record<ActivityType, string> = {
-  qualified: "text-primary",
-  escalated: "text-amber-400",
-  booked: "text-primary",
-  message_sent: "text-sky-400",
-  reminder_sent: "text-sky-400",
-  review_requested: "text-amber-400",
-  portal_action: "text-sky-400",
-  missed_call_recovery: "text-purple-400",
+/** Same semantic tokens ApprovalQueueCard/SUGGESTION_META use, so a given
+ * meaning (attention/informational/AI-driven) always reads the same color
+ * across the dashboard, not just within this one component. */
+const COLOR_VAR_FOR: Record<ActivityType, string> = {
+  qualified: "--primary-rgb",
+  escalated: "--color-attention",
+  booked: "--primary-rgb",
+  message_sent: "--color-info",
+  reminder_sent: "--color-info",
+  review_requested: "--color-attention",
+  portal_action: "--color-info",
+  missed_call_recovery: "--color-ai",
 };
 
 export default function LiveActivityTicker() {
@@ -62,12 +65,13 @@ export default function LiveActivityTicker() {
 
   return (
     <div className="overflow-hidden border-t border-white/5 bg-background/40 py-1.5">
-      <div className="animate-ticker flex w-max gap-8 whitespace-nowrap px-8">
+      <div className="motion-safe:animate-ticker flex w-max gap-8 whitespace-nowrap px-8">
         {loopItems.map((item, i) => {
           const Icon = ICON_FOR[item.type] ?? Sparkles;
+          const colorVar = COLOR_VAR_FOR[item.type];
           return (
             <span key={`${item.id}-${i}`} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Icon className={`h-3 w-3 ${COLOR_FOR[item.type] ?? "text-muted-foreground"}`} />
+              <Icon className="h-3 w-3" style={colorVar ? { color: `rgb(var(${colorVar}))` } : undefined} />
               {item.summary}
             </span>
           );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
@@ -154,6 +154,26 @@ export default function TopNav() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [simulateOpen, setSimulateOpen] = useState(false);
   const [broadcastOpen, setBroadcastOpen] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
+
+  useEffect(() => {
+    if (!currentClientId) return;
+    let cancelled = false;
+    async function loadPendingCount() {
+      const { count } = await supabaseBrowser
+        .from("lead_suggestions")
+        .select("id", { count: "exact", head: true })
+        .eq("client_id", currentClientId)
+        .eq("status", "pending");
+      if (!cancelled) setPendingCount(count ?? 0);
+    }
+    loadPendingCount();
+    const interval = setInterval(loadPendingCount, 20000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [currentClientId]);
 
   function isActive(href: string) {
     return pathname === href || pathname?.startsWith(href + "/");
@@ -267,27 +287,46 @@ export default function TopNav() {
 
         <div className="hidden items-center gap-2 md:flex">
           <CommandPalette />
+          {pendingCount > 0 && (
+            <Link
+              href="/dashboard/approvals"
+              className="flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors hover:brightness-110"
+              style={{
+                borderColor: "rgba(var(--color-attention), 0.25)",
+                background: "rgba(var(--color-attention), 0.1)",
+                color: "rgb(var(--color-attention))",
+              }}
+              aria-label={`${pendingCount} pending action${pendingCount === 1 ? "" : "s"} awaiting review`}
+            >
+              <span className="h-1.5 w-1.5 rounded-full" style={{ background: "rgb(var(--color-attention))" }} />
+              {pendingCount} pending
+            </Link>
+          )}
           <HealthAuditButton />
           <div className="flex items-center gap-2 rounded-full border border-white/10 bg-secondary/30 px-3 py-1.5">
-            <FlaskConical className={`h-3.5 w-3.5 ${sandbox ? "text-amber-400" : "text-muted-foreground"}`} />
+            <FlaskConical
+              className={cn("h-3.5 w-3.5", !sandbox && "text-muted-foreground")}
+              style={sandbox ? { color: "rgb(var(--color-attention))" } : undefined}
+              aria-hidden="true"
+            />
             <span className="text-xs font-medium text-foreground">{sandbox ? "Sandbox" : "Live"}</span>
-            <Switch checked={sandbox} onCheckedChange={setSandbox} />
+            <Switch checked={sandbox} onCheckedChange={setSandbox} aria-label="Toggle sandbox mode" />
           </div>
           <Button onClick={() => setSimulateOpen(true)} size="sm" className="gap-1.5">
             <Zap className="h-4 w-4" />
             Simulate Lead
           </Button>
-          <Button onClick={() => setBroadcastOpen(true)} size="icon" variant="outline" title="Broadcast Update">
+          <Button onClick={() => setBroadcastOpen(true)} size="icon" variant="outline" aria-label="Broadcast update to leads" title="Broadcast Update">
             <Radio className="h-4 w-4" />
           </Button>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-1.5 rounded-md px-1.5 py-1 hover:bg-accent">
+              <button className="flex items-center gap-1.5 rounded-md px-1.5 py-1 hover:bg-accent" aria-label="Account menu">
                 <Avatar className="h-7 w-7">
                   <AvatarFallback className="text-[10px]">{initials(currentClient?.name ?? userEmail ?? "?")}</AvatarFallback>
                 </Avatar>
-                <ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground" />
+                <ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
@@ -312,7 +351,11 @@ export default function TopNav() {
           </DropdownMenu>
         </div>
 
-        <button className="rounded-md p-2 text-muted-foreground hover:bg-accent md:hidden" onClick={() => setMobileOpen(true)}>
+        <button
+          className="rounded-md p-2 text-muted-foreground hover:bg-accent md:hidden"
+          onClick={() => setMobileOpen(true)}
+          aria-label="Open navigation menu"
+        >
           <Menu className="h-5 w-5" />
         </button>
 
