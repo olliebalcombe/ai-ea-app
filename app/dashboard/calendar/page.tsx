@@ -126,11 +126,11 @@ export default function CalendarPage() {
           const dayBookings = byDay.get(key) ?? [];
           const isToday = key === toDateKey(new Date());
           return (
-            <Card key={key} className={`min-h-[220px] p-3 ${isToday ? "border-primary/40" : ""}`}>
+            <Card key={key} className={`min-h-[220px] p-3 ${isToday ? "border-sky-400/40" : ""}`}>
               <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 {d.toLocaleDateString("en-GB", { weekday: "short" })}
               </div>
-              <div className={`mb-3 text-lg font-semibold ${isToday ? "text-primary" : "text-foreground"}`}>
+              <div className={`mb-3 text-lg font-semibold ${isToday ? "text-sky-400" : "text-foreground"}`}>
                 {d.getDate()}
               </div>
               <div className="space-y-2">

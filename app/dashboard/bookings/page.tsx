@@ -203,8 +203,8 @@ export default function BookingsPage() {
             <button
               onClick={() => setView("grid")}
               className={cn(
-                "flex items-center gap-1 rounded px-2.5 py-1 text-xs transition-colors",
-                view === "grid" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground"
+                "flex items-center gap-1 rounded-md px-3 py-1.5 text-xs transition-colors",
+                view === "grid" ? "bg-white/10 font-medium text-white" : "text-zinc-400 hover:text-zinc-200"
               )}
             >
               <LayoutGrid className="h-3.5 w-3.5" /> Visual Cards
@@ -212,8 +212,8 @@ export default function BookingsPage() {
             <button
               onClick={() => setView("table")}
               className={cn(
-                "flex items-center gap-1 rounded px-2.5 py-1 text-xs transition-colors",
-                view === "table" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground"
+                "flex items-center gap-1 rounded-md px-3 py-1.5 text-xs transition-colors",
+                view === "table" ? "bg-white/10 font-medium text-white" : "text-zinc-400 hover:text-zinc-200"
               )}
             >
               <Table2 className="h-3.5 w-3.5" /> Compact Table
