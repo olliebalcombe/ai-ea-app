@@ -11,6 +11,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import type { KnowledgeBaseEntry, KnowledgeCategory } from "@/types";
 
+const TAB_TRIGGER_CLASS =
+  "rounded-md px-3 py-1.5 font-medium text-zinc-400 data-[state=active]:bg-white/10 data-[state=active]:text-white data-[state=active]:shadow-none hover:text-zinc-200";
+
+const PRIMARY_CTA_CLASS = "bg-emerald-500 hover:bg-emerald-400 text-black font-medium rounded-md px-4 py-2";
+
 const KB_SECTIONS: { category: KnowledgeCategory; label: string; icon: typeof PoundSterling; placeholder: string }[] = [
   { category: "pricing_rule", label: "Pricing Rules", icon: PoundSterling, placeholder: "e.g. call-out fee waived if booked" },
   { category: "faq", label: "FAQs", icon: HelpCircle, placeholder: "e.g. do you work weekends?" },
@@ -94,10 +99,10 @@ export default function BusinessMemoryPage() {
 
       <Tabs defaultValue="knowledge">
         <TabsList className="mb-4">
-          <TabsTrigger value="knowledge">
+          <TabsTrigger value="knowledge" className={TAB_TRIGGER_CLASS}>
             <BookOpen className="h-3.5 w-3.5" /> Knowledge Base
           </TabsTrigger>
-          <TabsTrigger value="rules">
+          <TabsTrigger value="rules" className={TAB_TRIGGER_CLASS}>
             <ShieldAlert className="h-3.5 w-3.5" /> Hard Rules ({businessRules.length})
           </TabsTrigger>
         </TabsList>
@@ -118,7 +123,7 @@ export default function BusinessMemoryPage() {
                   </CardHeader>
                   <CardContent className="space-y-3">
                     {items.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">Nothing added yet.</p>
+                      <p className="text-sm text-zinc-400">Nothing added yet.</p>
                     ) : (
                       <div className="space-y-2">
                         {items.map((item) => (
@@ -157,7 +162,7 @@ export default function BusinessMemoryPage() {
                         placeholder="Details…"
                         rows={2}
                       />
-                      <Button type="submit" size="sm" variant="outline">
+                      <Button type="submit" size="sm" className={PRIMARY_CTA_CLASS}>
                         Add
                       </Button>
                     </form>
@@ -183,7 +188,7 @@ export default function BusinessMemoryPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 {businessRules.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No rules added yet.</p>
+                  <p className="text-sm text-zinc-400">No rules added yet.</p>
                 ) : (
                   <div className="space-y-2">
                     {businessRules.map((rule) => (
@@ -218,7 +223,7 @@ export default function BusinessMemoryPage() {
                     placeholder="e.g. Never offer more than 10% off without owner approval"
                     rows={2}
                   />
-                  <Button type="submit" size="sm" variant="outline">
+                  <Button type="submit" size="sm" className={PRIMARY_CTA_CLASS}>
                     Add rule
                   </Button>
                 </form>

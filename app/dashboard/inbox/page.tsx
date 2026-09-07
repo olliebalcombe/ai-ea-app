@@ -3,13 +3,15 @@
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { Phone, MessageSquare, Mail, Sparkles, ArrowRight } from "lucide-react";
+import { Phone, MessageSquare, Mail, Sparkles, ArrowRight, Send } from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabaseClient";
 import { useCurrentClient } from "@/lib/clientContext";
 import { cn } from "@/lib/utils";
 import { staggerContainer, staggerItem, hoverShift } from "@/lib/motion";
 import ApprovalQueueCard from "@/components/ApprovalQueueCard";
 import StatusBadge from "@/components/StatusBadge";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import type { Lead, LeadMessage, LeadSuggestion } from "@/types";
 
@@ -20,6 +22,9 @@ const CHANNEL_META = {
 };
 
 type SuggestionRow = LeadSuggestion & { leads: { name: string | null } | null };
+
+const TAB_TRIGGER_CLASS =
+  "rounded-md px-3 py-1.5 font-medium text-zinc-400 data-[state=active]:bg-white/10 data-[state=active]:text-white data-[state=active]:shadow-none hover:text-zinc-200";
 
 function initial(lead: Lead) {
   return (lead.name ?? "?")[0]?.toUpperCase() ?? "?";
@@ -47,20 +52,48 @@ function ConversationList({
   suggestionsByLead: Map<string, SuggestionRow>;
 }) {
   const [messages, setMessages] = useState<LeadMessage[]>([]);
+  const [replyText, setReplyText] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
   const active = leads.find((l) => l.id === activeId) ?? null;
+
+  const loadMessages = useCallback(async (id: string) => {
+    const { data } = await supabaseBrowser
+      .from("lead_messages")
+      .select("*")
+      .eq("lead_id", id)
+      .order("created_at", { ascending: true });
+    setMessages((data as LeadMessage[]) ?? []);
+  }, []);
 
   useEffect(() => {
     if (!activeId) {
       setMessages([]);
       return;
     }
-    supabaseBrowser
-      .from("lead_messages")
-      .select("*")
-      .eq("lead_id", activeId)
-      .order("created_at", { ascending: true })
-      .then(({ data }) => setMessages((data as LeadMessage[]) ?? []));
-  }, [activeId]);
+    loadMessages(activeId);
+  }, [activeId, loadMessages]);
+
+  async function sendReply() {
+    if (!activeId || !replyText.trim() || sending) return;
+    setSending(true);
+    setSendError(null);
+    try {
+      const res = await fetch(`/api/leads/${activeId}/send-message`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body: replyText.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Send failed");
+      setReplyText("");
+      loadMessages(activeId);
+    } catch (e) {
+      setSendError(e instanceof Error ? e.message : "Send failed");
+    } finally {
+      setSending(false);
+    }
+  }
 
   return (
     <div className="flex overflow-hidden rounded-lg border border-border" style={{ height: "calc(100vh - 14rem)" }}>
@@ -83,8 +116,8 @@ function ConversationList({
               whileHover={hoverShift}
               onClick={() => onSelect(l.id)}
               className={cn(
-                "mb-1 flex cursor-pointer items-start gap-2.5 rounded-lg p-2.5 hover:bg-accent",
-                isActive && "bg-primary/10"
+                "flex min-h-[64px] cursor-pointer items-start gap-2.5 border-b border-zinc-800/80 px-4 py-3 hover:bg-accent",
+                isActive ? "border-l-2 border-l-emerald-500 bg-zinc-800/60" : "border-l-2 border-l-transparent"
               )}
             >
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-purple-500 text-xs font-bold text-background">
@@ -132,22 +165,48 @@ function ConversationList({
               {messages.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No messages logged for this lead yet.</p>
               ) : (
-                messages.map((m) => (
-                  <div
-                    key={m.id}
-                    className={cn(
-                      "max-w-[70%] rounded-lg px-3 py-2 text-sm",
-                      m.sender === "lead"
-                        ? "ml-auto bg-primary text-primary-foreground"
-                        : m.sender === "ai" || m.sender === "staff"
-                        ? "bg-muted text-foreground"
-                        : "mx-auto bg-amber-500/10 text-center text-xs italic text-amber-300"
-                    )}
-                  >
-                    {m.body}
-                  </div>
-                ))
+                messages.map((m) =>
+                  m.sender === "lead" || m.sender === "ai" || m.sender === "staff" ? (
+                    <div
+                      key={m.id}
+                      className={cn(
+                        "max-w-[70%] rounded-lg px-3 py-2 text-sm",
+                        m.sender === "lead" ? "ml-auto bg-primary text-primary-foreground" : "bg-muted text-foreground"
+                      )}
+                    >
+                      {m.body}
+                    </div>
+                  ) : (
+                    <div
+                      key={m.id}
+                      className="mx-auto w-fit rounded-full bg-zinc-800/70 px-3 py-1 text-xs text-zinc-400"
+                    >
+                      {m.body}
+                    </div>
+                  )
+                )
               )}
+            </div>
+            <div className="sticky bottom-0 border-t border-zinc-800 bg-zinc-900 p-3">
+              {sendError && <p className="mb-2 text-xs text-destructive">{sendError}</p>}
+              <div className="flex items-end gap-2">
+                <Textarea
+                  value={replyText}
+                  onChange={(e) => setReplyText(e.target.value)}
+                  placeholder="Write a reply…"
+                  rows={1}
+                  className="min-h-0 resize-none"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      sendReply();
+                    }
+                  }}
+                />
+                <Button size="icon" onClick={sendReply} disabled={sending || !replyText.trim()} aria-label="Send reply">
+                  <Send className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </>
         ) : (
@@ -200,9 +259,15 @@ export default function InboxPage() {
       <h1 className="mb-6 text-2xl font-semibold tracking-tight text-foreground">Inbox</h1>
       <Tabs defaultValue={searchParams.get("tab") === "approval" ? "approval" : "handled"}>
         <TabsList className="mb-4">
-          <TabsTrigger value="handled">Handled ({handled.length})</TabsTrigger>
-          <TabsTrigger value="approval">Approval ({suggestions.length})</TabsTrigger>
-          <TabsTrigger value="needsme">Needs you ({needsMe.length})</TabsTrigger>
+          <TabsTrigger value="handled" className={TAB_TRIGGER_CLASS}>
+            Handled ({handled.length})
+          </TabsTrigger>
+          <TabsTrigger value="approval" className={TAB_TRIGGER_CLASS}>
+            Approval ({suggestions.length})
+          </TabsTrigger>
+          <TabsTrigger value="needsme" className={TAB_TRIGGER_CLASS}>
+            Needs you ({needsMe.length})
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="handled" className="mt-0">
