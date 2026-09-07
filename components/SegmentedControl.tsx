@@ -26,7 +26,11 @@ export default function SegmentedControl<T extends string>({
   label?: string;
 }) {
   return (
-    <div role="tablist" aria-label={label} className={cn("inline-flex items-center gap-0.5 rounded-md border border-border p-0.5", className)}>
+    <div
+      role="tablist"
+      aria-label={label}
+      className={cn("no-scrollbar inline-flex max-w-full items-center gap-0.5 overflow-x-auto rounded-md border border-border p-0.5", className)}
+    >
       {options.map((opt) => {
         const Icon = opt.icon;
         const active = opt.value === value;
@@ -38,7 +42,7 @@ export default function SegmentedControl<T extends string>({
             aria-selected={active}
             onClick={() => onChange(opt.value)}
             className={cn(
-              "flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              "flex shrink-0 items-center gap-1 rounded px-2.5 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               size === "sm" && "px-2 py-0.5 text-[11px]",
               active ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground"
             )}

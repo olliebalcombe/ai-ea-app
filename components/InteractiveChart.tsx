@@ -77,6 +77,9 @@ export default function InteractiveChart({ leads }: { leads: Lead[] }) {
     return { data: series, changePct: pct };
   }, [leads, metric, period]);
 
+  const nonZeroBuckets = data.filter((p) => p.value > 0).length;
+  const chartHeight = nonZeroBuckets <= 2 ? 140 : nonZeroBuckets <= 5 ? 180 : 220;
+
   const formatValue = (v: number | string) => {
     const n = typeof v === "string" ? parseFloat(v) : v;
     return metric === "Revenue" ? `£${n.toLocaleString("en-GB")}` : metric === "Conversion Rate" ? `${n}%` : `${n}`;
@@ -113,7 +116,7 @@ export default function InteractiveChart({ leads }: { leads: Lead[] }) {
         </span>
       </div>
 
-      <ResponsiveContainer width="100%" height={220}>
+      <ResponsiveContainer width="100%" height={chartHeight}>
         <AreaChart data={data} margin={CHART_MARGIN}>
           <defs>
             <linearGradient id="interactiveChartGradient" x1="0" y1="0" x2="0" y2="1">

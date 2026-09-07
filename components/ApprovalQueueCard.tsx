@@ -104,7 +104,7 @@ export default function ApprovalQueueCard({
               <motion.div
                 key={s.id}
                 whileHover={reduceMotion ? undefined : hoverShift}
-                className="glow-hover flex items-center gap-2 rounded-lg border border-white/5 bg-white/[0.02] px-2.5 py-2 focus-within:ring-2 focus-within:ring-ring"
+                className="glow-hover group flex items-center gap-2 rounded-lg border border-white/5 bg-white/[0.02] px-2.5 py-2 focus-within:ring-2 focus-within:ring-ring"
               >
                 <span
                   className="flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-medium"
@@ -126,16 +126,16 @@ export default function ApprovalQueueCard({
                     {leadName} — {s.reason}
                   </TooltipContent>
                 </Tooltip>
-                <div className="flex shrink-0 items-center gap-1">
+                <div className="flex shrink-0 items-center gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
                   {meta.hasMessage ? (
-                    <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[10px]" onClick={onReview}>
+                    <Button size="sm" variant="ghost" className="h-11 px-1.5 text-[10px] sm:h-6" onClick={onReview}>
                       Review <ArrowRight className="h-2.5 w-2.5" />
                     </Button>
                   ) : (
                     <Button
                       size="icon"
                       variant="ghost"
-                      className="h-6 w-6"
+                      className="h-11 w-11 sm:h-6 sm:w-6"
                       onClick={() => approve(s)}
                       disabled={acting === s.id}
                       aria-label={`Approve: ${s.reason}`}
@@ -147,7 +147,7 @@ export default function ApprovalQueueCard({
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="h-6 w-6"
+                    className="h-11 w-11 sm:h-6 sm:w-6"
                     onClick={() => dismiss(s)}
                     disabled={acting === s.id}
                     aria-label={`Dismiss: ${s.reason}`}

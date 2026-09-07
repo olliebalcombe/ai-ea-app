@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Sparkles, AlertTriangle, CalendarCheck, MessageSquare, Bell, Star, Globe, PhoneCall, type LucideIcon } from "lucide-react";
+import { Sparkles, AlertTriangle, CalendarCheck, MessageSquare, Bell, Star, Globe, PhoneCall, X, type LucideIcon } from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabaseClient";
 import { useCurrentClient } from "@/lib/clientContext";
 import type { ActivityLogEntry, ActivityType } from "@/types";
@@ -33,9 +33,14 @@ const COLOR_VAR_FOR: Record<ActivityType, string> = {
   missed_call_recovery: "--color-ai",
 };
 
+/** Discrete, individually-dismissible notification strip -- deduplicated by
+ * message text (identical events collapse to one), no auto-scrolling
+ * marquee (the previous version), so nothing moves unless the visitor
+ * scrolls it themselves. */
 export default function LiveActivityTicker() {
   const { currentClientId } = useCurrentClient();
   const [items, setItems] = useState<ActivityLogEntry[]>([]);
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!currentClientId) return;
@@ -59,20 +64,36 @@ export default function LiveActivityTicker() {
     };
   }, [currentClientId]);
 
-  if (items.length === 0) return null;
+  const seenSummaries = new Set<string>();
+  const visibleItems = items.filter((item) => {
+    if (dismissedIds.has(item.id)) return false;
+    if (seenSummaries.has(item.summary)) return false;
+    seenSummaries.add(item.summary);
+    return true;
+  });
 
-  const loopItems = [...items, ...items];
+  if (visibleItems.length === 0) return null;
 
   return (
-    <div className="overflow-hidden border-t border-white/5 bg-background/40 py-1.5">
-      <div className="motion-safe:animate-ticker flex w-max gap-8 whitespace-nowrap px-8">
-        {loopItems.map((item, i) => {
+    <div className="border-b border-zinc-800 bg-zinc-900/60 py-2" role="status" aria-live="polite">
+      <div className="no-scrollbar flex gap-2 overflow-x-auto px-4">
+        {visibleItems.map((item) => {
           const Icon = ICON_FOR[item.type] ?? Sparkles;
           const colorVar = COLOR_VAR_FOR[item.type];
           return (
-            <span key={`${item.id}-${i}`} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Icon className="h-3 w-3" style={colorVar ? { color: `rgb(var(${colorVar}))` } : undefined} />
+            <span
+              key={item.id}
+              className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-white/5 bg-white/[0.02] py-1 pl-2.5 pr-1.5 text-xs text-muted-foreground"
+            >
+              <Icon className="h-3 w-3 shrink-0" style={colorVar ? { color: `rgb(var(${colorVar}))` } : undefined} aria-hidden="true" />
               {item.summary}
+              <button
+                onClick={() => setDismissedIds((prev) => new Set(prev).add(item.id))}
+                className="ml-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-muted-foreground/70 hover:bg-white/10 hover:text-foreground"
+                aria-label="Dismiss"
+              >
+                <X className="h-3 w-3" />
+              </button>
             </span>
           );
         })}

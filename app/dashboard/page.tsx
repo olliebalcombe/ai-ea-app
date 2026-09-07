@@ -317,7 +317,7 @@ export default function DashboardOverviewPage() {
     <motion.div variants={staggerContainer} initial={reduceMotion ? false : "initial"} animate="animate">
       <motion.div variants={staggerItem} className="mb-5 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="font-serifDisplay text-[32px] font-normal leading-tight tracking-tight text-foreground">
+          <h1 className="text-[32px] font-semibold leading-tight tracking-tight text-foreground">
             Good morning, {displayName}.
           </h1>
           <p className="mt-0.5 text-sm text-muted-foreground">{todayLabel}</p>
@@ -337,10 +337,15 @@ export default function DashboardOverviewPage() {
           className="glow-ring p-5 xl:col-span-7"
           style={{ borderColor: "rgba(var(--color-attention), 0.25)", background: "rgba(var(--color-attention), 0.04)" }}
         >
-          <div className="mb-3 flex items-center gap-2">
+          <div className="mb-1 flex items-center gap-2">
             <ClipboardCheck className="h-4 w-4" style={{ color: "rgb(var(--color-attention))" }} aria-hidden="true" />
             <h2 className="text-sm font-semibold text-foreground">Urgent Approval Queue</h2>
           </div>
+          <p className="mb-3 text-xs text-muted-foreground">
+            {suggestions.length > 0
+              ? `Highest priority first — ${Math.min(3, suggestions.length)} of ${suggestions.length} shown.`
+              : "Nothing needs your decision right now."}
+          </p>
           <ApprovalQueueCard
             suggestions={suggestions.slice(0, 3)}
             onChange={load}
@@ -397,7 +402,17 @@ export default function DashboardOverviewPage() {
 
         {/* Active Conversations -- 7 of 12 columns */}
         <Card className="p-5 xl:col-span-7">
-          <h2 className="mb-3 text-sm font-semibold text-foreground">Active Conversations</h2>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-foreground">Active Conversations</h2>
+            {activeConversations.length > 0 && (
+              <button
+                onClick={() => router.push("/dashboard/inbox")}
+                className="text-sm text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+              >
+                Open Inbox
+              </button>
+            )}
+          </div>
           {activeConversations.length === 0 ? (
             <EmptyState
               icon={MessagesSquare}
@@ -406,7 +421,7 @@ export default function DashboardOverviewPage() {
             />
           ) : (
             <div className="space-y-1.5">
-              {activeConversations.map((c) => {
+              {activeConversations.slice(0, 4).map((c) => {
                 const Icon = CHANNEL_ICON[c.channel];
                 return (
                   <motion.button
