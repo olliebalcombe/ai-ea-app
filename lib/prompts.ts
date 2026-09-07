@@ -128,19 +128,38 @@ const KNOWLEDGE_CATEGORY_LABEL: Record<KnowledgeBaseEntry["category"], string> =
   business_rule: "Hard rules",
 };
 
-function formatKnowledgeBase(entries: KnowledgeBaseEntry[] | null | undefined) {
-  if (!entries || entries.length === 0) return "";
+/**
+ * Categories where guessing is genuinely risky if Business Memory hasn't
+ * been filled in yet -- a wrong price, coverage area, or specialty claim can
+ * cost real money or trust, unlike a generic FAQ. Checked independently of
+ * whether the client has ANY knowledge base entries at all, so a client with
+ * only FAQs filled in still gets flagged for the categories they've skipped.
+ */
+const GROUNDED_CATEGORIES: { category: KnowledgeBaseEntry["category"]; topic: string }[] = [
+  { category: "pricing_rule", topic: "pricing" },
+  { category: "service_area", topic: "which areas are covered" },
+  { category: "team_specialty", topic: "who on the team specializes in what" },
+];
 
-  const rules = entries.filter((e) => e.category === "business_rule");
-  const soft = entries.filter((e) => e.category !== "business_rule");
+function formatUngroundedEscalation(entries: KnowledgeBaseEntry[]) {
+  const present = new Set(entries.map((e) => e.category));
+  const missing = GROUNDED_CATEGORIES.filter((g) => !present.has(g.category));
+  if (missing.length === 0) return "";
+  return `\n\nBusiness Memory hasn't been filled in yet for: ${missing.map((m) => m.topic).join(", ")}. If the customer asks about any of these, do not guess or answer from general knowledge -- tell them you'll need to check with the team and get back to them, and let the conversation be flagged for follow-up instead of answering.`;
+}
+
+function formatKnowledgeBase(entries: KnowledgeBaseEntry[] | null | undefined) {
+  const list = entries ?? [];
+  const rules = list.filter((e) => e.category === "business_rule");
+  const soft = list.filter((e) => e.category !== "business_rule");
 
   let out = "";
   if (soft.length > 0) {
     const byCategory = new Map<string, string[]>();
     for (const e of soft) {
-      const list = byCategory.get(e.category) ?? [];
-      list.push(`${e.title}: ${e.content}`);
-      byCategory.set(e.category, list);
+      const items = byCategory.get(e.category) ?? [];
+      items.push(`${e.title}: ${e.content}`);
+      byCategory.set(e.category, items);
     }
     const sections = Array.from(byCategory.entries())
       .map(([cat, items]) => `${KNOWLEDGE_CATEGORY_LABEL[cat as KnowledgeBaseEntry["category"]]}:\n${items.map((i) => `- ${i}`).join("\n")}`)
@@ -150,6 +169,7 @@ function formatKnowledgeBase(entries: KnowledgeBaseEntry[] | null | undefined) {
   if (rules.length > 0) {
     out += `\n\nHard rules -- you must never violate these, even if the customer pushes back, negotiates, or asks nicely. If a request would require breaking one (e.g. a bigger discount than allowed), acknowledge it warmly but hold the line, and flag it for the team instead:\n${rules.map((r) => `- ${r.title}: ${r.content}`).join("\n")}`;
   }
+  out += formatUngroundedEscalation(list);
   return out;
 }
 

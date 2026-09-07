@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { sendSms } from "@/lib/twilio";
-import { buildVoiceOpener } from "@/lib/prompts";
+import { generateGroundedVoiceOpener } from "@/lib/voiceOpener";
 
 function escapeXml(text: string) {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -33,11 +33,29 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const { data: lead } = await supabaseAdmin
+  // Find the most recent open lead for this phone number (covers a customer who
+  // already has an open SMS thread calling in, or calling back after an earlier
+  // missed call), same consolidation pattern as the SMS webhook -- one lead
+  // record per customer per open enquiry, not one per channel.
+  let { data: lead } = await supabaseAdmin
     .from("leads")
-    .insert({ client_id: client.id, phone: from, channel: "call", status: "New" })
-    .select()
+    .select("*")
+    .eq("client_id", client.id)
+    .eq("phone", from)
+    .neq("status", "Won")
+    .neq("status", "Lost")
+    .order("created_at", { ascending: false })
+    .limit(1)
     .single();
+
+  if (!lead) {
+    const { data: newLead } = await supabaseAdmin
+      .from("leads")
+      .insert({ client_id: client.id, phone: from, channel: "call", status: "New" })
+      .select()
+      .single();
+    lead = newLead;
+  }
 
   const skills: string[] = client.enabled_skills ?? [];
   if (!skills.includes("voice_ai_receptionist")) {
@@ -56,7 +74,7 @@ export async function POST(req: NextRequest) {
   }
 
   // No contact phone configured -- every call is treated as missed, same as before.
-  const openingMessage = buildVoiceOpener({ assistantName: client.assistant_name, toneStyle: client.tone_style });
+  const openingMessage = await generateGroundedVoiceOpener(client);
   await supabaseAdmin.from("lead_messages").insert({ lead_id: lead!.id, sender: "ai", body: openingMessage });
   await sendSms(from, openingMessage);
 
