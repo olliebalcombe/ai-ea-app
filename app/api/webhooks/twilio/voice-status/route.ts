@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
 
   try {
     if (isLandline) {
-      const greeting = await generateGroundedVoiceOpener(client);
+      const greeting = await generateGroundedVoiceOpener(client, leadId ?? undefined);
       const twiml = `<Response><Say voice="${client.voice_style}">${escapeXml(greeting)}</Say></Response>`;
       await makeCall({ to: from, twiml });
       if (leadId) {
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
       // Mobile (or unknown -- treated as mobile, the safer default): instant
       // real SMS. Styled as a WhatsApp-style handoff, but this is a real SMS,
       // not the WhatsApp Business API -- consistent with this app's standing caveat.
-      const message = await generateGroundedVoiceOpener(client);
+      const message = await generateGroundedVoiceOpener(client, leadId ?? undefined);
       await sendSms(from, message);
       if (leadId) {
         await supabaseAdmin.from("lead_messages").insert({ lead_id: leadId, sender: "ai", body: message });

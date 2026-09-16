@@ -6,6 +6,9 @@ import { buildSystemPrompt, buildFlooringStructuredTool } from "@/lib/prompts";
 import { loadQuestionConfig } from "@/lib/qualifyingQuestions";
 import { sendNotificationForEvent } from "@/lib/notifications";
 import { logActivity } from "@/lib/activityLog";
+import { getConversationSummary, recordConversationTurn } from "@/lib/conversationSummary";
+
+const RECENT_HISTORY_LIMIT = 4;
 
 /**
  * Twilio calls this webhook for every inbound SMS -- both a lead's first
@@ -62,16 +65,22 @@ export async function POST(req: NextRequest) {
     return new NextResponse("<Response></Response>", { headers: { "Content-Type": "text/xml" } });
   }
 
-  const { data: pastMessages } = await supabaseAdmin
+  // Only the last few raw messages -- everything older is captured in the
+  // cross-channel conversation_summaries row instead of being replayed in
+  // full every turn (see lib/conversationSummary.ts).
+  const { data: recentMessages } = await supabaseAdmin
     .from("lead_messages")
     .select("*")
     .eq("lead_id", lead.id)
-    .order("created_at", { ascending: true });
+    .order("created_at", { ascending: false })
+    .limit(RECENT_HISTORY_LIMIT);
 
-  const history: ConversationTurn[] = (pastMessages || []).map((m) => ({
-    role: m.sender === "lead" ? "user" : "assistant",
-    content: m.body,
-  }));
+  const history: ConversationTurn[] = (recentMessages || [])
+    .slice()
+    .reverse()
+    .map((m) => ({ role: m.sender === "lead" ? "user" : "assistant", content: m.body }));
+
+  const conversationSummary = await getConversationSummary(lead.id);
 
   const { data: answeredRows } = await supabaseAdmin.from("lead_answers").select("question").eq("lead_id", lead.id);
   const answeredQuestions = new Set((answeredRows || []).map((r) => r.question));
@@ -95,6 +104,7 @@ export async function POST(req: NextRequest) {
     businessNuances: client.business_nuances,
     knowledgeBase,
     questionGuidance: questionConfig.filter((q) => questionsRemaining.includes(q.question)),
+    conversationSummary,
   });
   const { reply, extractedAnswers, escalation, structuredFields } = await runQualificationTurn({
     systemPrompt,
@@ -137,7 +147,13 @@ export async function POST(req: NextRequest) {
   }
 
   await supabaseAdmin.from("lead_messages").insert({ lead_id: lead.id, sender: "ai", body: reply });
-  await sendSms(from, reply);
+  await Promise.all([
+    sendSms(from, reply),
+    recordConversationTurn(lead.id, [
+      { role: "user", content: body },
+      { role: "assistant", content: reply },
+    ]),
+  ]);
 
   return new NextResponse("<Response></Response>", { headers: { "Content-Type": "text/xml" } });
 }

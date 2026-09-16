@@ -1,7 +1,7 @@
 // Vertical-specific conversational configuration.
 // This is where the "personality" and tone rules from the prototype live for real.
 
-import type { ToneStyle } from "@/types";
+import type { ToneStyle, ConversationSummary } from "@/types";
 import type { StructuredToolDef } from "@/lib/anthropic";
 
 export const DEFAULT_QUESTIONS: Record<string, string[]> = {
@@ -173,6 +173,26 @@ function formatKnowledgeBase(entries: KnowledgeBaseEntry[] | null | undefined) {
   return out;
 }
 
+/**
+ * The cross-channel memory that replaces replaying full raw lead_messages
+ * history into every prompt -- see supabase/add_conversation_summaries.sql
+ * and lib/conversationSummary.ts. One row per lead regardless of which
+ * channel(s) it's touched, so a customer who called Friday and texts
+ * Saturday reads as one continuous relationship, not two.
+ */
+function formatConversationSummary(summary: ConversationSummary | null | undefined) {
+  if (!summary) return "";
+  const lines: string[] = [];
+  if (summary.stated_needs) lines.push(`- What they need: ${summary.stated_needs}`);
+  if (summary.budget_signal) lines.push(`- Budget signal: ${summary.budget_signal}`);
+  if (summary.urgency_signal) lines.push(`- Urgency: ${summary.urgency_signal}`);
+  if (summary.quote_given) lines.push(`- Quote already given: ${summary.quote_given}`);
+  if (summary.objections_raised) lines.push(`- Objections raised: ${summary.objections_raised}`);
+  if (summary.next_action) lines.push(`- Next action: ${summary.next_action}`);
+  if (lines.length === 0) return "";
+  return `\n\nWhat you already know about this specific customer from earlier in the conversation -- possibly on a different channel (they may have called before texting, or vice versa) -- don't make them repeat this:\n${lines.join("\n")}`;
+}
+
 export interface QuestionGuidance {
   question: string;
   ai_phrasing: string | null;
@@ -200,8 +220,10 @@ export function buildSystemPrompt(opts: {
   businessNuances: string | null;
   knowledgeBase?: KnowledgeBaseEntry[] | null;
   questionGuidance?: QuestionGuidance[] | null;
+  conversationSummary?: ConversationSummary | null;
 }) {
-  const { vertical, businessName, assistantName, channel, toneStyle, businessNuances, knowledgeBase, questionGuidance } = opts;
+  const { vertical, businessName, assistantName, channel, toneStyle, businessNuances, knowledgeBase, questionGuidance, conversationSummary } =
+    opts;
 
   const conciseness =
     channel === "sms"
@@ -213,6 +235,7 @@ export function buildSystemPrompt(opts: {
     : "";
 
   const knowledge = formatKnowledgeBase(knowledgeBase);
+  const summaryBlock = formatConversationSummary(conversationSummary);
   const guidance = formatQuestionGuidance(questionGuidance);
 
   return `You are ${assistantName}, a calm, sharp, highly competent human assistant answering enquiries for ${businessName}, a ${vertical} business.
@@ -230,7 +253,7 @@ Rules:
 - Never use any of these phrases or their close equivalents: ${BANNED_PHRASES.map((p) => `"${p}"`).join(", ")}.
 - If the person's answer touches something sensitive or distressing (an injury, an accident, a safeguarding concern), respond with genuine empathy first -- never with a casual "Great!" or "Lovely" after bad news.
 - If you detect anything suggesting a genuine emergency, medical crisis, or safeguarding risk, do not continue the standard flow -- tell the person you're connecting them with the team right away, and flag this conversation for immediate human review.
-- When you have everything you need, thank them by name if you know it, and let them know the team will be in touch shortly.${nuances}${knowledge}${guidance}
+- When you have everything you need, thank them by name if you know it, and let them know the team will be in touch shortly.${nuances}${knowledge}${summaryBlock}${guidance}
 
 Stay strictly in character as ${assistantName} from ${businessName}. Do not mention that you are an AI unless directly and explicitly asked.`;
 }
