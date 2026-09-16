@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
   }
 
   // No contact phone configured -- every call is treated as missed, same as before.
-  const openingMessage = await generateGroundedVoiceOpener(client);
+  const openingMessage = await generateGroundedVoiceOpener(client, lead!.id);
   await supabaseAdmin.from("lead_messages").insert({ lead_id: lead!.id, sender: "ai", body: openingMessage });
   await sendSms(from, openingMessage);
 

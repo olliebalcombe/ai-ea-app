@@ -158,6 +158,18 @@ export interface LeadMedia {
   created_at: string;
 }
 
+/** One row per lead, covering every channel -- see supabase/add_conversation_summaries.sql. */
+export interface ConversationSummary {
+  lead_id: string;
+  stated_needs: string | null;
+  budget_signal: string | null;
+  urgency_signal: string | null;
+  quote_given: string | null;
+  objections_raised: string | null;
+  next_action: string | null;
+  updated_at: string;
+}
+
 export type KnowledgeCategory = "pricing_rule" | "faq" | "service_area" | "team_specialty" | "business_rule";
 
 export interface KnowledgeBaseEntry {
