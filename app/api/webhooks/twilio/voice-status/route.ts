@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { sendSms, makeCall, lookupLineType } from "@/lib/twilio";
-import { buildVoiceOpener } from "@/lib/prompts";
+import { generateGroundedVoiceOpener } from "@/lib/voiceOpener";
 import { logActivity } from "@/lib/activityLog";
 
 function escapeXml(text: string) {
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
 
   try {
     if (isLandline) {
-      const greeting = buildVoiceOpener({ assistantName: client.assistant_name, toneStyle: client.tone_style });
+      const greeting = await generateGroundedVoiceOpener(client);
       const twiml = `<Response><Say voice="${client.voice_style}">${escapeXml(greeting)}</Say></Response>`;
       await makeCall({ to: from, twiml });
       if (leadId) {
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
       // Mobile (or unknown -- treated as mobile, the safer default): instant
       // real SMS. Styled as a WhatsApp-style handoff, but this is a real SMS,
       // not the WhatsApp Business API -- consistent with this app's standing caveat.
-      const message = `Hi! Sorry we missed your call at ${client.name}. How can we help with your enquiry today?`;
+      const message = await generateGroundedVoiceOpener(client);
       await sendSms(from, message);
       if (leadId) {
         await supabaseAdmin.from("lead_messages").insert({ lead_id: leadId, sender: "ai", body: message });

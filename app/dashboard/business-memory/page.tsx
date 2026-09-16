@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { X, PoundSterling, HelpCircle, MapPin, UserCheck, ShieldAlert, BookOpen } from "lucide-react";
+import { X, PoundSterling, HelpCircle, MapPin, UserCheck, ShieldAlert, BookOpen, Check, AlertTriangle } from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabaseClient";
 import { useCurrentClient } from "@/lib/clientContext";
+import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +22,13 @@ const KB_SECTIONS: { category: KnowledgeCategory; label: string; icon: typeof Po
   { category: "faq", label: "FAQs", icon: HelpCircle, placeholder: "e.g. do you work weekends?" },
   { category: "service_area", label: "Service Areas", icon: MapPin, placeholder: "e.g. GU postcodes" },
   { category: "team_specialty", label: "Team Specialties", icon: UserCheck, placeholder: "e.g. Tom — period properties" },
+];
+
+/** Every section the checklist tracks -- the 4 knowledge base categories plus
+ * Hard Rules, so it's obvious at a glance what's still ungrounded for the AI. */
+const CHECKLIST_SECTIONS: { category: KnowledgeCategory; label: string }[] = [
+  ...KB_SECTIONS.map((s) => ({ category: s.category, label: s.label })),
+  { category: "business_rule", label: "Hard Rules" },
 ];
 
 /**
@@ -91,9 +99,33 @@ export default function BusinessMemoryPage() {
   return (
     <div>
       <h1 className="mb-2 text-2xl font-semibold tracking-tight text-foreground">Business Memory</h1>
-      <p className="mb-6 text-sm text-muted-foreground">
+      <p className="mb-4 text-sm text-muted-foreground">
         What {assistantName} knows about this business and the imperative rules it must never break — transparent and editable.
       </p>
+
+      <div className="mb-6 flex flex-wrap gap-2" role="list" aria-label="Grounding checklist">
+        {CHECKLIST_SECTIONS.map((section) => {
+          const count = entries.filter((e) => e.category === section.category).length;
+          const isEmpty = count === 0;
+          return (
+            <span
+              key={section.category}
+              role="listitem"
+              className={cn(
+                "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs",
+                isEmpty ? "border-white/10 text-zinc-400" : "border-white/10 text-foreground"
+              )}
+            >
+              {isEmpty ? (
+                <AlertTriangle className="h-3 w-3 shrink-0" style={{ color: "rgb(var(--color-attention))" }} aria-hidden="true" />
+              ) : (
+                <Check className="h-3 w-3 shrink-0 text-primary" aria-hidden="true" />
+              )}
+              {section.label} {isEmpty ? "— not set up yet" : `(${count})`}
+            </span>
+          );
+        })}
+      </div>
 
       {error && <p className="mb-4 text-sm text-destructive">{error}</p>}
 
